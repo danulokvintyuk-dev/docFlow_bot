@@ -1,0 +1,52 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "**/src/**",
+      "**/*.md",
+      "**/*.sh",
+      "**/server.js",
+      "**/local-server.js",
+      "**/setup-database.*",
+      "**/create-classes-*",
+      "**/vs_bot.js",
+      "**/BACK4APP_SETUP.md",
+      "**/LOCAL_TESTING.md",
+      "**/QUICK_SETUP.md",
+      "**/README.md",
+      "**/start-local.sh",
+      "**/package.json",
+      "**/package-lock.json"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=3600"
+          }
+        ]
+      }
+    ]
+  }
+}
