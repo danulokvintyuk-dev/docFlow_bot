@@ -1,8 +1,8 @@
-// Railway API Service
+// Railway API Service (Render)
 class RailwayAPI {
     constructor() {
-        // Замініть на ваш Railway URL
-        this.serverURL = 'https://your-railway-app.up.railway.app/api';
+        // Render URL
+        this.serverURL = 'https://docflow-bot.onrender.com/api';
         this.userId = this.getUserId();
     }
 
