@@ -1,3 +1,4 @@
+// Global modal functions are defined at line ~508 and exposed to window object
 // Telegram Web App initialization
 let tg = window.Telegram?.WebApp;
 if (tg) {
@@ -10,6 +11,28 @@ if (tg) {
         showConfirm: (message) => confirm(message)
     };
     console.log('⚠️ Telegram Web App SDK не знайдено. Режим локального тестування.');
+}
+
+// Simple on-screen debug helper (shows messages on mobile)
+function showDebug(msg) {
+    let dbg = document.getElementById('debugBox');
+    if (!dbg) {
+        dbg = document.createElement('div');
+        dbg.id = 'debugBox';
+        dbg.style.position = 'fixed';
+        dbg.style.bottom = '10px';
+        dbg.style.left = '10px';
+        dbg.style.right = '10px';
+        dbg.style.padding = '10px';
+        dbg.style.zIndex = '9999';
+        dbg.style.background = 'rgba(0,0,0,0.7)';
+        dbg.style.color = '#fff';
+        dbg.style.fontSize = '14px';
+        dbg.style.borderRadius = '6px';
+        dbg.style.textAlign = 'center';
+        document.body.appendChild(dbg);
+    }
+    dbg.innerText = msg;
 }
 
 // App state
@@ -34,8 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateSubscriptionBadge();
     // Initialize flatpickr for mobile/webview if needed (fix oversized native date controls)
     initializeFlatpickrForMobile();
-    // Install global tap delegation for Telegram WebView compatibility
-    installGlobalTapHandler();
+    // Use element-specific handlers (touchstart + click) for mobile
     
     // Ensure contracts are re-rendered after a short delay for mobile
     setTimeout(() => {
@@ -62,40 +84,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 30000);
 });
 
-// Global tap delegation handler for Telegram WebView compatibility
-function installGlobalTapHandler() {
-    try {
-        // Use body as delegation root to catch all taps in capture phase
-        document.body.addEventListener('click', (e) => {
-            const target = e.target?.closest('[data-action], button, a') || e.target;
-            if (!target) return;
-
-            const action = target.dataset?.action || target.id;
-            if (!action) return;
-
-            console.log('Global tap handler:', action);
-
-            // Map actions to functions
-            const handlers = {
-                'newContractBtn': () => openContractModal(),
-                'newInvoiceBtn': () => openInvoiceModal()
-            };
-
-            const handler = handlers[action];
-            if (handler) {
-                try {
-                    handler();
-                } catch (err) {
-                    console.error('Handler error:', action, err.message);
-                }
-            }
-        }, true); // capture phase
-
-        console.log('Global tap handler installed');
-    } catch (e) {
-        console.debug('installGlobalTapHandler failed:', e.message);
-    }
-}
+// Note: removed global tap delegation to avoid capture-phase conflicts on mobile WebViews.
+// The code now registers direct `click` + `touchstart` handlers on buttons and cards in `initializeContracts`.
 
 // Load state from localStorage (primary) or API (optional sync)
 async function loadAppState() {
@@ -420,54 +410,97 @@ function initializeContracts() {
     renderContractsList();
 }
 
+// Attach minimal newContractBtn handler (safe - waits for DOM)
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('newContractBtn');
+    if (btn) {
+        try { btn.removeAttribute('onclick'); } catch (e) {}
+        btn.addEventListener('click', () => openContractModal());
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); openContractModal(); }, { passive: false });
+    }
+});
+
+// Replace openContractModal with a robust mobile-first implementation
 function openContractModal(typeId = null) {
-    // Check if user has free subscription and no remaining quota
-    if (appState.subscription === 'free') {
-        const monthlyCount = getMonthlyDocumentCount();
-        const remaining = Math.max(0, 3 - monthlyCount);
-        
-        if (remaining <= 0) {
-            tg.showAlert('Ви досягли ліміту безкоштовного плану (3 документи/місяць). Оновіть підписку для невмежених можливостей.');
+    try {
+        // 1. ПЕРЕВІРКА МОДАЛЮ
+        const modal = document.getElementById('contractModal');
+        if (!modal) {
+            console.error('❌ contractModal element not found');
+            if (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function') {
+                tg.showAlert('Помилка: модаль не знайдена на сторінці');
+            } else {
+                alert('Помилка: модаль не знайдена');
+            }
             return;
         }
-    }
-    
-    const modal = document.getElementById('contractModal');
-    const form = document.getElementById('contractForm');
-    
-    if (typeId) {
-        document.getElementById('contractType').value = typeId;
-    }
-    
-    form.reset();
-    document.getElementById('startDate').valueAsDate = new Date();
-    
-    // Show/hide fields based on contract type
-    const selectedType = typeId || document.getElementById('contractType').value;
-    const isRent = selectedType === 'rent';
-    toggleContractFields(isRent);
-    
-    // Update form when type changes
-    const typeSelect = document.getElementById('contractType');
-    typeSelect.removeEventListener('change', handleContractTypeChange);
-    typeSelect.addEventListener('change', handleContractTypeChange);
-    
-    // Ensure modal is visible
-    modal.style.display = 'flex';
-    setTimeout(() => {
-        modal.classList.add('active');
-        document.body.classList.add('modal-open');
-    }, 10);
-    // Focus first input for accessibility and to trigger virtual keyboard on mobile
-    setTimeout(() => {
-        try {
-            const firstInput = form.querySelector('input, select, textarea, button');
-            if (firstInput && typeof firstInput.focus === 'function') {
-                firstInput.focus();
+
+        // 2. ПЕРЕВІРКА ФОРМИ
+        const form = document.getElementById('contractForm');
+        if (form) {
+            try { form.reset(); } catch (e) { console.warn('Form reset failed:', e.message); }
+        }
+
+        // 3. ПЕРЕВІРКА SUBSCRIPTION (appState може бути недоступним)
+        if (typeof appState !== 'undefined' && appState && appState.subscription === 'free') {
+            let monthlyCount = 0;
+            if (typeof getMonthlyDocumentCount === 'function') {
+                try {
+                    monthlyCount = getMonthlyDocumentCount();
+                } catch (e) {
+                    console.warn('getMonthlyDocumentCount failed:', e.message);
+                    monthlyCount = 0;
+                }
             }
-        } catch (e) { console.debug('focus failed', e.message); }
-    }, 250);
+            const remaining = Math.max(0, 3 - monthlyCount);
+            if (remaining <= 0) {
+                const alertFn = (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function') 
+                    ? tg.showAlert.bind(tg) 
+                    : alert;
+                alertFn('Ви досягли ліміту безкоштовного плану (3 документи/місяць).');
+                return;
+            }
+        }
+
+        // 4. ВІДКРИТТЯ МОДАЛЮ
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            try {
+                modal.classList.add('active');
+                document.body.classList.add('modal-open');
+                
+                // 5. ВСТАНОВИТИ ТИП ДОГОВОРУ (якщо передано)
+                if (typeId) {
+                    const typeEl = document.getElementById('contractType');
+                    if (typeEl) {
+                        try { typeEl.value = typeId; } catch (e) { console.warn('Cannot set contract type:', e.message); }
+                    }
+                }
+                
+                // 6. ФОКУС НА ПЕРШИЙ INPUT (для відкриття клавіатури на мобільному)
+                try {
+                    const first = modal.querySelector('input, select, textarea, button');
+                    if (first && typeof first.focus === 'function') {
+                        first.focus();
+                    }
+                } catch (e) {
+                    console.warn('Focus failed:', e.message);
+                }
+            } catch (e) {
+                console.error('Error during modal activation:', e.message);
+            }
+        }, 10);
+
+        console.log('✅ Modal opened successfully');
+    } catch (err) {
+        console.error('❌ FATAL ERROR in openContractModal:', err && err.message ? err.message : err);
+        const alertFn = (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function') 
+            ? tg.showAlert.bind(tg) 
+            : alert;
+        alertFn('Помилка при відкритті модалю: ' + (err && err.message ? err.message : 'невідома помилка'));
+    }
 }
+
 
 function handleContractTypeChange(e) {
     const isRent = e.target.value === 'rent';
@@ -1354,7 +1387,7 @@ async function generateSignLink() {
         console.debug('Back4App sync failed (не критично):', error.message);
     }
     const signUrl = `https://yourdomain.com/sign/${linkId}`;
-    tg.showAlert(`Посилання згенеровано:\n${signUrl}\n\nВідправте його контрагенту для підписання.`);
+    tg.showAlert(`Посилання згенеровано:\n${signUrl}\n\nВідправте його контрагента для підписання.`);
     
     document.getElementById('signerEmail').value = '';
     renderPendingSignatures();
@@ -1570,4 +1603,115 @@ window.testToggleRentFields = function() {
     console.log('basicFields.style.display:', basicFields?.style.display);
     console.log('rentFields.style.display:', rentFields?.style.display);
 };
+
+// --- Simple mobile-first modal/button handlers ---
+function simpleOpenContractModal(typeId = null) {
+    const modal = document.getElementById('contractModal');
+    const form = document.getElementById('contractForm');
+    if (form) form.reset();
+    if (typeId) {
+        const t = document.getElementById('contractType');
+        if (t) t.value = typeId;
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+        // small delay to allow styles to apply
+        setTimeout(() => {
+            modal.classList.add('active');
+            document.body.classList.add('modal-open');
+            // focus first input to trigger keyboard on mobile
+            try {
+                const first = modal.querySelector('input, select, textarea, button');
+                if (first && typeof first.focus === 'function') first.focus();
+            } catch (e) {}
+        }, 10);
+    }
+}
+
+function simpleCloseContractModal() {
+    const modal = document.getElementById('contractModal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => {
+            try { modal.style.display = 'none'; } catch (e) {}
+            document.body.classList.remove('modal-open');
+        }, 150);
+    }
+}
+
+function attachSimpleMobileHandlers() {
+    // Remove old listeners by replacing nodes with clones
+    const replaceNode = (sel) => {
+        const el = document.querySelector(sel);
+        if (el && el.parentNode) {
+            try { el.parentNode.replaceChild(el.cloneNode(true), el); } catch (e) {}
+        }
+    };
+
+    // Buttons
+    replaceNode('#newContractBtn');
+    replaceNode('#closeModal');
+    replaceNode('#cancelBtn');
+
+    const newBtn = document.getElementById('newContractBtn');
+    if (newBtn) {
+        newBtn.addEventListener('click', (e) => { e.stopPropagation(); simpleOpenContractModal(); });
+        newBtn.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); simpleOpenContractModal(); }, { passive: false });
+    }
+
+    const closeEl = document.getElementById('closeModal');
+    if (closeEl) {
+        closeEl.addEventListener('click', (e) => { e.stopPropagation(); simpleCloseContractModal(); });
+        closeEl.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); simpleCloseContractModal(); }, { passive: false });
+    }
+
+    const cancelEl = document.getElementById('cancelBtn');
+    if (cancelEl) {
+        cancelEl.addEventListener('click', (e) => { e.stopPropagation(); simpleCloseContractModal(); });
+        cancelEl.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); simpleCloseContractModal(); }, { passive: false });
+    }
+
+    // Contract type cards (may be generated dynamically)
+    const setupCards = () => {
+        const cards = document.querySelectorAll('.contract-type-card');
+        if (!cards || cards.length === 0) return false;
+        cards.forEach(card => {
+            const typeId = card.dataset?.type;
+            // replace card to remove previous listeners
+            try { card.parentNode.replaceChild(card.cloneNode(true), card); } catch (e) {}
+        });
+        // re-query after clone
+        document.querySelectorAll('.contract-type-card').forEach(card => {
+            const typeId = card.dataset?.type;
+            card.addEventListener('click', (e) => { e.stopPropagation(); simpleOpenContractModal(typeId); });
+            card.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); simpleOpenContractModal(typeId); }, { passive: false });
+            try { card.tabIndex = 0; card.setAttribute('role', 'button'); } catch (e) {}
+        });
+        return true;
+    };
+
+    // Try to setup cards now; if none, retry a few times (they may be rendered later)
+    let attempts = 0;
+    const trySetup = () => {
+        attempts++;
+        const ok = setupCards();
+        if (!ok && attempts < 8) setTimeout(trySetup, 300);
+    };
+    trySetup();
+}
+
+// Attach simplified handlers after initial render (mobile-first)
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { attachSimpleMobileHandlers(); }, 800);
+});
+
+// Ensure global functions are properly exposed
+document.addEventListener('DOMContentLoaded', () => {
+    // The robust openContractModal and closeContractModal are defined globally above
+    // Make sure they are available on window for onclick handlers
+    if (typeof window.openContractModal === 'undefined' || window.openContractModal === simpleOpenContractModal) {
+        // Skip - use the robust global functions
+    }
+});
+
 

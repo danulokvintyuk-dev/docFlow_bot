@@ -508,6 +508,7 @@ body.modal-open {
     background: var(--bg-secondary);
     color: var(--text-primary);
     transition: var(--transition);
+    box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -1159,10 +1160,35 @@ body.modal-open {
         font-size: 16px;
     }
     
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-group label {
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    
     .form-group input,
     .form-group select,
     .form-group textarea {
         font-size: 13px;
+        padding: 12px 14px;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+        max-width: 100%;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .form-row {
+        display: block;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .form-row .form-group {
+        margin-bottom: 12px;
     }
     
     .main-content {
