@@ -350,6 +350,14 @@ function initializeContracts() {
                 const typeId = card.dataset.type;
                 openContractModal(typeId);
             });
+            // Add touchstart for mobile/webview to ensure immediate response
+            card.addEventListener('touchstart', (ev) => {
+                ev.preventDefault();
+                const typeId = card.dataset.type;
+                openContractModal(typeId);
+            }, { passive: false });
+            // Make cards keyboard-focusable and behave like buttons
+            try { card.tabIndex = 0; card.setAttribute('role', 'button'); card.style.touchAction = 'manipulation'; } catch (e) {}
         });
         
         newContractBtn.style.display = 'block';
@@ -450,6 +458,15 @@ function openContractModal(typeId = null) {
         modal.classList.add('active');
         document.body.classList.add('modal-open');
     }, 10);
+    // Focus first input for accessibility and to trigger virtual keyboard on mobile
+    setTimeout(() => {
+        try {
+            const firstInput = form.querySelector('input, select, textarea, button');
+            if (firstInput && typeof firstInput.focus === 'function') {
+                firstInput.focus();
+            }
+        } catch (e) { console.debug('focus failed', e.message); }
+    }, 250);
 }
 
 function handleContractTypeChange(e) {
