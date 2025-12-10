@@ -3,48 +3,55 @@ const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-// Telegram Bot Token (from vs_bot.js)
-const BOT_TOKEN = '7561904266:AAFjav_tANptvTghfFr7Z-SnUJcT-dqcGb4';
+// Telegram Bot Token - NEW TOKEN
+const BOT_TOKEN = '8157459514:AAGpIH9kXChzVX1pV3zykYZAhg3EHuRrNfo';
+const WEBHOOK_URL = process.env.RENDER_EXTERNAL_URL || 'https://docflow-bot.onrender.com';
 
-// Initialize Telegram Bot with proper error handling
+// Initialize Telegram Bot with webhook (NO POLLING)
 const bot = new TelegramBot(BOT_TOKEN, { 
-    polling: false // Don't start polling yet
+    webHook: {
+        port: PORT,
+        host: '0.0.0.0'
+    }
 });
 
-// Flag to prevent multiple polling instances
-let isRunning = true;
+// Parse JSON
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Clean up old polling before starting new one
-async function initializeBot() {
+// Webhook endpoint for Telegram
+app.post(`/bot${BOT_TOKEN}`, (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
+});
+
+// Setup webhook on start
+async function setupWebhook() {
     try {
-        console.log('🤖 Cleaning up old Telegram polling...');
-        // Delete webhook if exists
-        await bot.deleteWebHook();
-        console.log('✓ Webhook deleted');
+        console.log('🤖 Setting up Telegram webhook...');
         
-        // Wait a moment
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Delete old webhook
+        try {
+            await bot.deleteWebHook({ drop_pending_updates: true });
+            console.log('✓ Old webhook deleted');
+        } catch (e) {
+            // Ignore if no webhook exists
+        }
         
-        // Get updates to clear queue
-        const updates = await bot.getUpdates({ timeout: 0, limit: 1 });
-        console.log(`✓ Cleared ${updates.length} pending updates`);
+        // Wait
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Now start polling
-        console.log('📡 Starting polling...');
-        bot.startPolling({
-            interval: 1000,
-            params: {
-                timeout: 10,
-                allowed_updates: ['message', 'callback_query', 'web_app_info']
-            }
-        });
-        console.log('✓ Polling started successfully');
+        // Set new webhook
+        const webhookPath = `/bot${BOT_TOKEN}`;
+        const fullWebhookUrl = `${WEBHOOK_URL}${webhookPath}`;
+        await bot.setWebHook(fullWebhookUrl);
+        console.log(`✓ Webhook set: ${fullWebhookUrl}`);
+        console.log('✓ Bot ready!');
     } catch (error) {
-        console.error('❌ Error initializing bot:', error.message);
-        // Retry after delay
-        setTimeout(initializeBot, 5000);
+        console.error('❌ Webhook error:', error.message);
+        setTimeout(setupWebhook, 5000);
     }
 }
 
@@ -106,48 +113,25 @@ bot.on('message', (msg) => {
 // Start server
 const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    // Initialize bot after server starts
-    initializeBot();
+    // Setup webhook after server starts
+    setupWebhook();
 });
 
-// Error handling for bot polling
-bot.on('polling_error', (error) => {
-    if (error.code === 'ETELEGRAM') {
-        if (error.response?.statusCode === 409) {
-            // 409 Conflict - another instance is running
-            console.log('⚠️  Bot conflict (409) - another instance running. Stopping and retrying...');
-            bot.stopPolling();
-            setTimeout(() => {
-                console.log('🔄 Attempting to restart bot...');
-                initializeBot();
-            }, 3000);
-        } else if (error.response?.statusCode === 401) {
-            // 401 Unauthorized - bad token
-            console.error('❌ Invalid bot token!');
-            process.exit(1);
-        } else {
-            console.error('Telegram API error:', error.response?.statusCode || error.message);
-        }
-    } else {
-        console.error('Polling error:', error.message || error);
-    }
+// Error handling
+bot.on('webhook_error', (error) => {
+    console.error('Webhook error:', error.message);
 });
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
     console.log('\n🛑 Shutting down gracefully...');
-    isRunning = false;
     
     try {
-        // Stop bot polling
-        await bot.stopPolling();
-        console.log('✓ Bot polling stopped');
-        
         // Delete webhook
         await bot.deleteWebHook();
         console.log('✓ Webhook deleted');
     } catch (error) {
-        console.error('Error stopping bot:', error.message);
+        console.error('Error cleaning up bot:', error.message);
     }
     
     // Close server
