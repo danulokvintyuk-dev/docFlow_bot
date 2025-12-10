@@ -71,7 +71,7 @@ bot.onText(/\/start/, (msg) => {
             inline_keyboard: [[
                 {
                     text: '📄 Відкрити Документообіг PRO',
-                    web_app: { url: `https://yourdomain.com` } // Замініть на ваш URL
+                    web_app: { url: `https://docflow-bot.onrender.com` } // Render URL
                 }
             ]]
         }
