@@ -10,16 +10,43 @@ const BOT_TOKEN = '7561904266:AAFjav_tANptvTghfFr7Z-SnUJcT-dqcGb4';
 
 // Initialize Telegram Bot with proper error handling
 const bot = new TelegramBot(BOT_TOKEN, { 
-    polling: true,
-    polling: {
-        interval: 1000,
-        autoStart: true,
-        params: { timeout: 10, allowed_updates: ['message', 'callback_query', 'web_app_info'] }
-    }
+    polling: false // Don't start polling yet
 });
 
 // Flag to prevent multiple polling instances
 let isRunning = true;
+
+// Clean up old polling before starting new one
+async function initializeBot() {
+    try {
+        console.log('🤖 Cleaning up old Telegram polling...');
+        // Delete webhook if exists
+        await bot.deleteWebHook();
+        console.log('✓ Webhook deleted');
+        
+        // Wait a moment
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Get updates to clear queue
+        const updates = await bot.getUpdates({ timeout: 0, limit: 1 });
+        console.log(`✓ Cleared ${updates.length} pending updates`);
+        
+        // Now start polling
+        console.log('📡 Starting polling...');
+        bot.startPolling({
+            interval: 1000,
+            params: {
+                timeout: 10,
+                allowed_updates: ['message', 'callback_query', 'web_app_info']
+            }
+        });
+        console.log('✓ Polling started successfully');
+    } catch (error) {
+        console.error('❌ Error initializing bot:', error.message);
+        // Retry after delay
+        setTimeout(initializeBot, 5000);
+    }
+}
 
 // Serve static files
 app.use(express.static(__dirname));
@@ -79,21 +106,28 @@ bot.on('message', (msg) => {
 // Start server
 const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Telegram bot is running`);
+    // Initialize bot after server starts
+    initializeBot();
 });
 
 // Error handling for bot polling
 bot.on('polling_error', (error) => {
-    if (error.code === 'ETELEGRAM' && error.response?.statusCode === 409) {
-        // 409 Conflict - another instance is running, retry after delay
-        console.log('Bot conflict detected - another instance running. Retrying...');
-        setTimeout(() => {
-            try {
-                bot.startPolling();
-            } catch (e) {
-                console.error('Error restarting polling:', e.message);
-            }
-        }, 5000);
+    if (error.code === 'ETELEGRAM') {
+        if (error.response?.statusCode === 409) {
+            // 409 Conflict - another instance is running
+            console.log('⚠️  Bot conflict (409) - another instance running. Stopping and retrying...');
+            bot.stopPolling();
+            setTimeout(() => {
+                console.log('🔄 Attempting to restart bot...');
+                initializeBot();
+            }, 3000);
+        } else if (error.response?.statusCode === 401) {
+            // 401 Unauthorized - bad token
+            console.error('❌ Invalid bot token!');
+            process.exit(1);
+        } else {
+            console.error('Telegram API error:', error.response?.statusCode || error.message);
+        }
     } else {
         console.error('Polling error:', error.message || error);
     }
@@ -108,6 +142,10 @@ const gracefulShutdown = async () => {
         // Stop bot polling
         await bot.stopPolling();
         console.log('✓ Bot polling stopped');
+        
+        // Delete webhook
+        await bot.deleteWebHook();
+        console.log('✓ Webhook deleted');
     } catch (error) {
         console.error('Error stopping bot:', error.message);
     }
@@ -120,7 +158,7 @@ const gracefulShutdown = async () => {
     
     // Force exit after 10 seconds
     setTimeout(() => {
-        console.error('Forced shutdown timeout - exiting');
+        console.error('⏱️  Forced shutdown timeout - exiting');
         process.exit(1);
     }, 10000);
 };
