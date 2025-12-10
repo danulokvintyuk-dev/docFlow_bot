@@ -69,53 +69,18 @@ function installGlobalTapHandler() {
         document.body.addEventListener('click', (e) => {
             const target = e.target?.closest('[data-action], button, a') || e.target;
             if (!target) return;
-            
+
             const action = target.dataset?.action || target.id;
             if (!action) return;
-            
+
             console.log('Global tap handler:', action);
-            
-            // Map actions to functions
-            const handlers = {
-                'newContractBtn': () => openContractModal(),
-                'newInvoiceBtn': () => openInvoiceModal(),
-                'debugStateBtn': () => showDebugState()
-            };
-            
-            const handler = handlers[action];
-            if (handler) {
-                try {
-                    handler();
-                } catch (err) {
-                    console.error('Handler error:', action, err.message);
-                }
-            }
-        }, true); // capture phase
-        
-        console.log('Global tap handler installed');
-    } catch (e) {
-        console.debug('installGlobalTapHandler failed:', e.message);
-    }
-}
-// Global tap delegation handler for Telegram WebView compatibility
-function installGlobalTapHandler() {
-    try {
-        // Use body as delegation root to catch all taps in capture phase
-        document.body.addEventListener('click', (e) => {
-            const target = e.target?.closest('[data-action], button, a') || e.target;
-            if (!target) return;
-            
-            const action = target.dataset?.action || target.id;
-            if (!action) return;
-            
-            console.log('Global tap handler:', action);
-            
+
             // Map actions to functions
             const handlers = {
                 'newContractBtn': () => openContractModal(),
                 'newInvoiceBtn': () => openInvoiceModal()
             };
-            
+
             const handler = handlers[action];
             if (handler) {
                 try {
@@ -125,7 +90,7 @@ function installGlobalTapHandler() {
                 }
             }
         }, true); // capture phase
-        
+
         console.log('Global tap handler installed');
     } catch (e) {
         console.debug('installGlobalTapHandler failed:', e.message);
@@ -404,17 +369,23 @@ function initializeContracts() {
         console.debug('newContractBtn not found');
     }
 
-    document.getElementById('closeModal').addEventListener('click', closeContractModal);
-    document.getElementById('closeModal').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        closeContractModal();
-    }, { passive: false });
-    
-    document.getElementById('cancelBtn').addEventListener('click', closeContractModal);
-    document.getElementById('cancelBtn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        closeContractModal();
-    }, { passive: false });
+    const closeModalEl = document.getElementById('closeModal');
+    if (closeModalEl) {
+        closeModalEl.addEventListener('click', closeContractModal);
+        closeModalEl.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            closeContractModal();
+        }, { passive: false });
+    }
+
+    const cancelBtnEl = document.getElementById('cancelBtn');
+    if (cancelBtnEl) {
+        cancelBtnEl.addEventListener('click', closeContractModal);
+        cancelBtnEl.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            closeContractModal();
+        }, { passive: false });
+    }
     
     // Add modal background click handler to close modal
     const contractModal = document.getElementById('contractModal');
@@ -503,8 +474,12 @@ function toggleContractFields(isRent) {
 }
 
 function closeContractModal() {
-    document.body.classList.remove('modal-open');
-    document.getElementById('contractModal').classList.remove('active');
+    const modal = document.getElementById('contractModal');
+    if (modal) {
+        modal.classList.remove('active');
+        // hide after animation/frame
+        setTimeout(() => { try { modal.style.display = 'none'; } catch (e) {} }, 150);
+    }
     document.body.classList.remove('modal-open');
 }
 
