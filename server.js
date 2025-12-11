@@ -4,6 +4,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const cors = require('cors');
 const { Document, Packer, Paragraph, AlignmentType } = require('docx');
 const stream = require('stream');
+const { Readable } = require('stream');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -254,8 +255,7 @@ app.post('/api/send-doc', async (req, res) => {
         });
 
         const buffer = await Packer.toBuffer(doc);
-        const fileStream = new stream.PassThrough();
-        fileStream.end(buffer);
+        const fileStream = Readable.from(buffer);
 
         await bot.sendDocument(
             chatId,
