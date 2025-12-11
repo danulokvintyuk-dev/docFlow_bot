@@ -451,8 +451,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Replace openContractModal with a robust mobile-first implementation
 function openContractModal(typeId = null) {
+    closeAllModals();
     try {
-        // 1. ПЕРЕВІРКА МОДАЛЮ
         const modal = document.getElementById('contractModal');
         if (!modal) {
             console.error('❌ contractModal element not found');
@@ -463,14 +463,10 @@ function openContractModal(typeId = null) {
             }
             return;
         }
-
-        // 2. ПЕРЕВІРКА ФОРМИ
         const form = document.getElementById('contractForm');
         if (form) {
             try { form.reset(); } catch (e) { console.warn('Form reset failed:', e.message); }
         }
-
-        // 3. ПЕРЕВІРКА SUBSCRIPTION (appState може бути недоступним)
         if (typeof appState !== 'undefined' && appState && appState.subscription === 'free') {
             let monthlyCount = 0;
             if (typeof getMonthlyDocumentCount === 'function') {
@@ -483,23 +479,19 @@ function openContractModal(typeId = null) {
             }
             const remaining = Math.max(0, 3 - monthlyCount);
             if (remaining <= 0) {
-                const alertFn = (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function') 
-                    ? tg.showAlert.bind(tg) 
+                const alertFn = (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function')
+                    ? tg.showAlert.bind(tg)
                     : alert;
                 alertFn('Ви досягли ліміту безкоштовного плану (3 документи/місяць).');
                 return;
             }
         }
-
-        // 4. ВІДКРИТТЯ МОДАЛЮ
         modal.style.display = 'flex';
         contractModalClosing = false; // reset close guard
         setTimeout(() => {
             try {
                 modal.classList.add('active');
                 document.body.classList.add('modal-open');
-                
-                // 5. ВСТАНОВИТИ ТИП ДОГОВОРУ (якщо передано)
                 if (typeId) {
                     const typeEl = document.getElementById('contractType');
                     if (typeEl) {
@@ -512,8 +504,6 @@ function openContractModal(typeId = null) {
                         try { toggleContractFields(typeEl.value === 'rent'); } catch (e) {}
                     }
                 }
-                
-                // 6. ФОКУС НА ПЕРШИЙ INPUT (для відкриття клавіатури на мобільному)
                 try {
                     const first = modal.querySelector('input, select, textarea, button');
                     if (first && typeof first.focus === 'function') {
@@ -526,17 +516,20 @@ function openContractModal(typeId = null) {
                 console.error('Error during modal activation:', e.message);
             }
         }, 10);
-
         console.log('✅ Modal opened successfully');
     } catch (err) {
-        console.error('❌ FATAL ERROR in openContractModal:', err && err.message ? err.message : err);
-        const alertFn = (typeof tg !== 'undefined' && tg && typeof tg.showAlert === 'function') 
-            ? tg.showAlert.bind(tg) 
-            : alert;
-        alertFn('Помилка при відкритті модалю: ' + (err && err.message ? err.message : 'невідома помилка'));
+        console.error('Error in openContractModal:', err);
     }
 }
 
+function closeContractModal() {
+    const modal = document.getElementById('contractModal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+    document.body.classList.remove('modal-open');
+}
 
 function handleContractTypeChange(e) {
     const isRent = e.target.value === 'rent';
@@ -563,19 +556,6 @@ function toggleContractFields(isRent) {
         basicRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = true; });
         rentRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = false; });
     }
-}
-
-function closeContractModal() {
-    const modal = document.getElementById('contractModal');
-    if (!modal || contractModalClosing) return;
-    contractModalClosing = true;
-    modal.classList.remove('active');
-    document.body.classList.remove('modal-open');
-    // hide after animation/frame
-    setTimeout(() => { 
-        try { modal.style.display = 'none'; } catch (e) {} 
-        contractModalClosing = false;
-    }, 180);
 }
 
 async function handleContractSubmit(e) {
@@ -1053,15 +1033,24 @@ function initializeInvoices() {
     document.getElementById('invoiceDate').valueAsDate = new Date();
 }
 
+function closeAllModals() {
+    document.body.classList.remove('modal-open');
+    ['invoiceModal', 'contractModal'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    });
+}
+
 function openInvoiceModal(type = 'invoice') {
+    closeAllModals();
     const modal = document.getElementById('invoiceModal');
     const form = document.getElementById('invoiceForm');
-    
     document.getElementById('invoiceType').value = type;
     form.reset();
     document.getElementById('invoiceDate').valueAsDate = new Date();
-    
-    // Reset items
     const itemsContainer = document.getElementById('invoiceItems');
     itemsContainer.innerHTML = `
         <div class="invoice-item">
@@ -1071,10 +1060,7 @@ function openInvoiceModal(type = 'invoice') {
             <button type="button" class="remove-item-btn">×</button>
         </div>
     `;
-    
     attachItemListeners();
-    
-    // Ensure modal is visible
     modal.style.display = 'flex';
     setTimeout(() => {
         modal.classList.add('active');
@@ -1083,8 +1069,11 @@ function openInvoiceModal(type = 'invoice') {
 }
 
 function closeInvoiceModal() {
-    document.body.classList.remove('modal-open');
-    document.getElementById('invoiceModal').classList.remove('active');
+    const modal = document.getElementById('invoiceModal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
     document.body.classList.remove('modal-open');
 }
 
