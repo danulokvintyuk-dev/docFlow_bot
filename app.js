@@ -1543,6 +1543,7 @@ setTimeout(() => {
 }, 100);
 
 const SERVER_GENERATE_URL = 'https://docflow-bot.onrender.com/api/generate-docx';
+const SERVER_SEND_URL = 'https://docflow-bot.onrender.com/api/send-doc';
 
 // Submit docx creation to server (avoids blob download in WebView)
 function submitDocxViaServer(content, filename) {
@@ -1571,6 +1572,37 @@ function submitDocxViaServer(content, filename) {
     } catch (e) {
         console.error('submitDocxViaServer failed:', e.message);
         tg.showAlert('Не вдалося відправити запит на сервер для завантаження.');
+    }
+}
+
+// Send doc via Telegram bot to user chat (works in WebApp)
+async function sendDocToTelegram(content, filename) {
+    try {
+        const chatId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        if (!chatId) {
+            console.warn('[download] chatId not available');
+            return false;
+        }
+        const resp = await fetch(SERVER_SEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, filename, chatId })
+        });
+        if (!resp.ok) {
+            const txt = await resp.text().catch(() => '');
+            console.warn('[download] send-doc failed', resp.status, txt);
+            return false;
+        }
+        const data = await resp.json().catch(() => ({}));
+        if (!data.ok) {
+            console.warn('[download] send-doc response not ok', data);
+            return false;
+        }
+        tg.showAlert('Файл відправлено у ваш чат Telegram. Перевірте діалог з ботом.');
+        return true;
+    } catch (e) {
+        console.warn('[download] sendDocToTelegram error', e.message);
+        return false;
     }
 }
 
@@ -1630,8 +1662,10 @@ async function createAndDownloadDocx(content, filename) {
     try {
         console.log('[contract] createAndDownloadDocx start', { filename });
         
-        // If running inside Telegram WebApp, delegate generation to server to avoid WebView blob issues
+        // If running inside Telegram WebApp, try to send via bot first, else server download
         if (window.Telegram?.WebApp) {
+            const sent = await sendDocToTelegram(content, filename);
+            if (sent) return;
             submitDocxViaServer(content, filename);
             return;
         }
