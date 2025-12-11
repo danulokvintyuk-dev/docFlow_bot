@@ -8,6 +8,9 @@
     <meta http-equiv="Expires" content="0">
     <title>DocFlow - Професійний документообіг</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- DOCX generator + file download helpers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/9.5.1/docx.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="styles.css">
     <!-- flatpickr for consistent datepicker on mobile/webviews -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -568,8 +571,31 @@
         </div>
     </div>
 
-    <script src="config.js?v=1.0.2"></script>
-    <script src="api.js?v=1.0.2"></script>
-    <script src="app.js?v=1.0.2"></script>
+    <!-- Bust cache for Telegram Web App -->
+    <script src="config.js?v=1.0.13"></script>
+    <script src="api.js?v=1.0.13"></script>
+    <script src="app.js?v=1.0.13"></script>
+    <script>
+        // Detect if app.js failed to load
+        setTimeout(() => {
+            if (!window.__APP_LOADED__) {
+                console.error('[init] app.js not loaded');
+                const warn = document.createElement('div');
+                warn.style.position = 'fixed';
+                warn.style.top = '0';
+                warn.style.left = '0';
+                warn.style.right = '0';
+                warn.style.padding = '12px';
+                warn.style.background = '#ffc107';
+                warn.style.color = '#000';
+                warn.style.textAlign = 'center';
+                warn.style.zIndex = '9999';
+                warn.textContent = 'Помилка завантаження скриптів. Оновіть сторінку (Ctrl+Shift+R).';
+                document.body.appendChild(warn);
+            } else {
+                console.log('[init] app.js marker found', window.__APP_VERSION__);
+            }
+        }, 800);
+    </script>
 </body>
 </html>

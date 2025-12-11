@@ -13,6 +13,19 @@ if (tg) {
     console.log('⚠️ Telegram Web App SDK не знайдено. Режим локального тестування.');
 }
 
+// Mark script load for diagnostics
+window.__APP_LOADED__ = true;
+window.__APP_VERSION__ = '1.0.9';
+
+// Basic diagnostics for browser console
+console.log('[init] app.js loaded');
+window.addEventListener('error', (e) => {
+    console.error('[global error]', e.message, e.filename, e.lineno, e.colno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+    console.error('[global unhandledrejection]', e.reason);
+});
+
 // Simple on-screen debug helper (shows messages on mobile)
 function showDebug(msg) {
     let dbg = document.getElementById('debugBox');
@@ -45,8 +58,12 @@ const appState = {
     taxSystem: 'single'
 };
 
+// Prevent double-close glitches on modal hide animation
+let contractModalClosing = false;
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[init] DOMContentLoaded');
     await loadAppState();
     initializeTabs();
     initializeContracts();
@@ -395,7 +412,15 @@ function initializeContracts() {
         });
     }
     
-    document.getElementById('contractForm').addEventListener('submit', handleContractSubmit);
+    const contractFormEl = document.getElementById('contractForm');
+    if (contractFormEl) {
+        // disable native validation to avoid hidden required errors; we validate manually
+        contractFormEl.setAttribute('novalidate', 'true');
+        contractFormEl.addEventListener('submit', handleContractSubmit);
+        console.log('[init] contractForm submit listener attached');
+    } else {
+        console.warn('[init] contractForm not found');
+    }
 
     // Populate contract type select
     const contractTypeSelect = document.getElementById('contractType');
@@ -405,6 +430,10 @@ function initializeContracts() {
         option.textContent = type.name;
         contractTypeSelect.appendChild(option);
     });
+    if (contractTypeSelect) {
+        contractTypeSelect.addEventListener('change', handleContractTypeChange);
+        toggleContractFields(contractTypeSelect.value === 'rent');
+    }
     
     // Render the list of created contracts
     renderContractsList();
@@ -464,6 +493,7 @@ function openContractModal(typeId = null) {
 
         // 4. ВІДКРИТТЯ МОДАЛЮ
         modal.style.display = 'flex';
+        contractModalClosing = false; // reset close guard
         setTimeout(() => {
             try {
                 modal.classList.add('active');
@@ -474,6 +504,12 @@ function openContractModal(typeId = null) {
                     const typeEl = document.getElementById('contractType');
                     if (typeEl) {
                         try { typeEl.value = typeId; } catch (e) { console.warn('Cannot set contract type:', e.message); }
+                        try { toggleContractFields(typeEl.value === 'rent'); } catch (e) {}
+                    }
+                } else {
+                    const typeEl = document.getElementById('contractType');
+                    if (typeEl) {
+                        try { toggleContractFields(typeEl.value === 'rent'); } catch (e) {}
                     }
                 }
                 
@@ -511,26 +547,35 @@ function toggleContractFields(isRent) {
     // Basic fields that should be hidden for rent
     const basicFields = document.getElementById('basicContractFields');
     const rentFields = document.getElementById('rentFields');
+    const basicRequiredIds = ['counterpartyName', 'startDate', 'contractAmount', 'contractSubject'];
+    const rentRequiredIds = ['rentStartDate', 'rentAmount'];
     
     if (isRent) {
         // Hide basic fields, show rent fields
         if (basicFields) basicFields.style.display = 'none';
         if (rentFields) rentFields.style.display = 'block';
+        basicRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = false; });
+        rentRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = true; });
     } else {
         // Show basic fields, hide rent fields
         if (basicFields) basicFields.style.display = 'block';
         if (rentFields) rentFields.style.display = 'none';
+        basicRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = true; });
+        rentRequiredIds.forEach(id => { const el = document.getElementById(id); if (el) el.required = false; });
     }
 }
 
 function closeContractModal() {
     const modal = document.getElementById('contractModal');
-    if (modal) {
-        modal.classList.remove('active');
-        // hide after animation/frame
-        setTimeout(() => { try { modal.style.display = 'none'; } catch (e) {} }, 150);
-    }
+    if (!modal || contractModalClosing) return;
+    contractModalClosing = true;
+    modal.classList.remove('active');
     document.body.classList.remove('modal-open');
+    // hide after animation/frame
+    setTimeout(() => { 
+        try { modal.style.display = 'none'; } catch (e) {} 
+        contractModalClosing = false;
+    }, 180);
 }
 
 async function handleContractSubmit(e) {
@@ -553,6 +598,8 @@ async function handleContractSubmit(e) {
         id: Date.now().toString()
     };
 
+    console.log('[contract] submit start', { type: contractType });
+
     // Для оренди використовуємо інші поля
     if (isRent) {
         formData.startDate = document.getElementById('rentStartDate')?.value || '';
@@ -569,6 +616,8 @@ async function handleContractSubmit(e) {
         formData.subject = document.getElementById('contractSubject')?.value || '';
         formData.additionalTerms = document.getElementById('additionalTerms')?.value || '';
     }
+
+    console.log('[contract] collected data', formData);
 
     // Додаткові поля для договору оренди
     if (isRent) {
@@ -612,12 +661,16 @@ async function handleContractSubmit(e) {
         // Не критично - дані вже в localStorage
         console.debug('Back4App sync failed (не критично):', error.message);
     }
+    console.log('[contract] generating file');
     generateContractPDF(formData);
-    closeContractModal();
-    renderContractsList();
     
-    tg.showAlert('Договір успішно згенеровано!');
-    updateAnalytics();
+    // Delay UI updates to avoid blocking the thread during file creation
+    setTimeout(() => {
+        try { closeContractModal(); } catch (e) {}
+        try { renderContractsList(); } catch (e) {}
+        try { updateAnalytics(); } catch (e) {}
+        try { tg.showAlert('Договір успішно згенеровано!'); } catch (e) {}
+    }, 50);
 }
 
 function getMonthlyDocumentCount() {
@@ -633,10 +686,19 @@ function getMonthlyDocumentCount() {
 function generateContractPDF(data) {
     const contractType = contractTypes.find(t => t.id === data.type);
     if (!contractType) {
+        const alertFn = (typeof tg !== 'undefined' && tg?.showAlert) ? tg.showAlert.bind(tg) : alert;
+        alertFn('Тип договору не обрано або не підтримується. Оберіть тип та повторіть.');
         return;
     }
     
     const template = getContractTemplate(data.type);
+    if (!template) {
+        const alertFn = (typeof tg !== 'undefined' && tg?.showAlert) ? tg.showAlert.bind(tg) : alert;
+        alertFn('Шаблон для цього типу не знайдено. Спробуйте інший тип або перезавантажте сторінку.');
+        return;
+    }
+    
+    console.log('[contract] generateContractPDF', { type: data.type, name: contractType.name });
     
     // Parse date for day, month, year
     const contractDate = new Date(data.startDate || new Date());
@@ -1480,11 +1542,76 @@ setTimeout(() => {
     renderInvoicesList();
 }, 100);
 
+// Unified blob download helper that works in Telegram WebApp and browsers
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+
+    // 1) FileSaver (якщо є)
+    if (typeof saveAs !== 'undefined') {
+        try {
+            saveAs(blob, filename);
+            setTimeout(() => URL.revokeObjectURL(url), 4000);
+            return;
+        } catch (e) {
+            console.debug('saveAs failed:', e.message);
+        }
+    }
+
+    // 2) Telegram openLink як спроба відкрити у зовнішньому браузері
+    try {
+        if (window.Telegram?.WebApp?.openLink) {
+            console.log('[download] using Telegram.openLink fallback');
+            window.Telegram.WebApp.openLink(url);
+            setTimeout(() => URL.revokeObjectURL(url), 4000);
+            return;
+        }
+    } catch (e) {
+        console.debug('openLink fallback failed:', e.message);
+    }
+
+    // 3) Прямий клік по посиланню
+    try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        return;
+    } catch (e) {
+        console.debug('anchor download failed:', e.message);
+    }
+
+    // 4) Відкрити у новій вкладці/браузері (де є менеджер завантажень)
+    try {
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        return;
+    } catch (e) {
+        console.debug('window.open failed:', e.message);
+    }
+
+    // 5) Останній шанс: скопіювати посилання у буфер та показати alert
+    try {
+        if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(url).catch(() => {});
+        }
+    } catch (e) {}
+    if (typeof tg !== 'undefined' && tg?.showAlert) {
+        tg.showAlert('Не вдалося автоматично завантажити файл. Посилання на файл скопійовано, вставте його у браузер.');
+    } else {
+        alert('Не вдалося автоматично завантажити файл. Посилання на файл скопійовано, вставте його у браузер.');
+    }
+}
+
 // Create and download DOCX file function
 async function createAndDownloadDocx(content, filename) {
     try {
+        console.log('[contract] createAndDownloadDocx start', { filename });
         // Check if docx library is available from CDN
         if (typeof docx !== 'undefined') {
+            console.log('[contract] docx available, building document');
             // Split content by lines
             const lines = content.split('\n');
             const children = [];
@@ -1531,50 +1658,29 @@ async function createAndDownloadDocx(content, filename) {
                 }]
             });
 
-            docx.Packer.toBlob(doc).then(blob => {
+            try {
+                const blob = await docx.Packer.toBlob(doc);
                 console.log('DOCX blob created, saving file');
-                if (typeof saveAs !== 'undefined') {
-                    saveAs(blob, filename);
-                } else {
-                    // Fallback download method
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    a.click();
-                    URL.revokeObjectURL(url);
+                triggerDownload(blob, filename);
+            } catch (err) {
+                console.error('docx pack error:', err);
+                if (typeof tg !== 'undefined' && tg?.showAlert) {
+                    tg.showAlert('Не вдалося створити DOCX. Спробуємо текстовий файл.');
                 }
-            }).catch(err => {
-                tg.showAlert('Помилка при створенні файла');
-            });
+                const fallbackBlob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                triggerDownload(fallbackBlob, filename.replace('.docx', '.txt'));
+            }
         } else {
+            console.warn('[contract] docx library not available, falling back to raw blob');
             // Fallback: create blob from text
             const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document;charset=utf-8' });
-            if (typeof saveAs !== 'undefined') {
-                saveAs(blob, filename);
-            } else {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
+            triggerDownload(blob, filename);
         }
     } catch (error) {
         console.error('Error creating DOCX:', error);
         // Fallback to text file
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        if (typeof saveAs !== 'undefined') {
-            saveAs(blob, filename.replace('.docx', '.txt'));
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename.replace('.docx', '.txt');
-            a.click();
-            URL.revokeObjectURL(url);
-        }
+        triggerDownload(blob, filename.replace('.docx', '.txt'));
     }
 }
 
