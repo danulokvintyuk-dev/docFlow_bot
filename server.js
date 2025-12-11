@@ -14,12 +14,7 @@ const BOT_TOKEN = '8157459514:AAGpIH9kXChzVX1pV3zykYZAhg3EHuRrNfo';
 const WEBHOOK_URL = process.env.RENDER_EXTERNAL_URL || 'https://docflow-bot.onrender.com';
 
 // Initialize Telegram Bot with webhook (NO POLLING)
-const bot = new TelegramBot(BOT_TOKEN, { 
-    webHook: {
-        port: PORT,
-        host: '0.0.0.0'
-    }
-});
+const bot = new TelegramBot(BOT_TOKEN); // Без webHook параметрів, порт слухає лише Express!
 
 // Parse JSON
 app.use(cors());
