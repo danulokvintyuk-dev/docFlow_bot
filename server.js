@@ -97,11 +97,15 @@ app.post('/api/send-doc', async (req, res) => {
         const fileStream = new stream.PassThrough();
         fileStream.end(buffer);
 
-        await bot.sendDocument(chatId, {
-            filename,
-            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            source: fileStream
-        });
+        await bot.sendDocument(
+            chatId,
+            fileStream,
+            {},
+            {
+                filename,
+                contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            }
+        );
 
         return res.json({ ok: true });
     } catch (err) {
