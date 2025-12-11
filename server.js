@@ -1,6 +1,8 @@
 const express = require('express');
 const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
+const cors = require('cors');
+const { Document, Packer, Paragraph, AlignmentType } = require('docx');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -18,8 +20,47 @@ const bot = new TelegramBot(BOT_TOKEN, {
 });
 
 // Parse JSON
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Simple DOCX generator endpoint for WebView downloads
+app.post('/api/generate-docx', async (req, res) => {
+    try {
+        const { content, filename } = req.body || {};
+        if (!content || !filename) {
+            return res.status(400).json({ error: 'content and filename are required' });
+        }
+
+        const lines = String(content).split('\n');
+        const children = lines.map(line => new Paragraph({
+            text: line || '',
+            spacing: { line: 280, after: line.trim() === '' ? 100 : 0 },
+            alignment: (line.length < 60 && (line === line.toUpperCase() || line.includes(':')))
+                ? AlignmentType.CENTER
+                : AlignmentType.JUSTIFIED
+        }));
+
+        const doc = new Document({
+            sections: [{
+                properties: {
+                    page: { margins: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }
+                },
+                children
+            }]
+        });
+
+        const buffer = await Packer.toBuffer(doc);
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
+        });
+        return res.send(buffer);
+    } catch (err) {
+        console.error('generate-docx error:', err.message);
+        res.status(500).json({ error: 'failed to generate docx' });
+    }
+});
 
 // Webhook endpoint for Telegram
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {

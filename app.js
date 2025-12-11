@@ -1542,7 +1542,39 @@ setTimeout(() => {
     renderInvoicesList();
 }, 100);
 
-// Unified blob download helper that works in Telegram WebApp and browsers
+const SERVER_GENERATE_URL = 'https://docflow-bot.onrender.com/api/generate-docx';
+
+// Submit docx creation to server (avoids blob download in WebView)
+function submitDocxViaServer(content, filename) {
+    try {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = SERVER_GENERATE_URL;
+        form.target = '_blank';
+        form.style.display = 'none';
+
+        const contentField = document.createElement('textarea');
+        contentField.name = 'content';
+        contentField.value = content;
+        form.appendChild(contentField);
+
+        const nameField = document.createElement('input');
+        nameField.type = 'hidden';
+        nameField.name = 'filename';
+        nameField.value = filename;
+        form.appendChild(nameField);
+
+        document.body.appendChild(form);
+        form.submit();
+        setTimeout(() => { try { form.remove(); } catch (e) {} }, 1000);
+        console.log('[download] submitted to server for docx');
+    } catch (e) {
+        console.error('submitDocxViaServer failed:', e.message);
+        tg.showAlert('Не вдалося відправити запит на сервер для завантаження.');
+    }
+}
+
+// Unified blob download helper (browser-first; Telegram uses server submit)
 function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
 
@@ -1557,19 +1589,7 @@ function triggerDownload(blob, filename) {
         }
     }
 
-    // 2) Telegram openLink як спроба відкрити у зовнішньому браузері
-    try {
-        if (window.Telegram?.WebApp?.openLink) {
-            console.log('[download] using Telegram.openLink fallback');
-            window.Telegram.WebApp.openLink(url);
-            setTimeout(() => URL.revokeObjectURL(url), 4000);
-            return;
-        }
-    } catch (e) {
-        console.debug('openLink fallback failed:', e.message);
-    }
-
-    // 3) Прямий клік по посиланню
+    // 2) Прямий клік по посиланню
     try {
         const a = document.createElement('a');
         a.href = url;
@@ -1583,7 +1603,7 @@ function triggerDownload(blob, filename) {
         console.debug('anchor download failed:', e.message);
     }
 
-    // 4) Відкрити у новій вкладці/браузері (де є менеджер завантажень)
+    // 3) Відкрити у новій вкладці/браузері (де є менеджер завантажень)
     try {
         window.open(url, '_blank');
         setTimeout(() => URL.revokeObjectURL(url), 4000);
@@ -1592,7 +1612,7 @@ function triggerDownload(blob, filename) {
         console.debug('window.open failed:', e.message);
     }
 
-    // 5) Останній шанс: скопіювати посилання у буфер та показати alert
+    // 4) Останній шанс: скопіювати посилання у буфер та показати alert
     try {
         if (navigator?.clipboard?.writeText) {
             navigator.clipboard.writeText(url).catch(() => {});
@@ -1609,6 +1629,13 @@ function triggerDownload(blob, filename) {
 async function createAndDownloadDocx(content, filename) {
     try {
         console.log('[contract] createAndDownloadDocx start', { filename });
+        
+        // If running inside Telegram WebApp, delegate generation to server to avoid WebView blob issues
+        if (window.Telegram?.WebApp) {
+            submitDocxViaServer(content, filename);
+            return;
+        }
+        
         // Check if docx library is available from CDN
         if (typeof docx !== 'undefined') {
             console.log('[contract] docx available, building document');
