@@ -37,22 +37,182 @@ app.post('/api/generate-docx', async (req, res) => {
             return res.status(400).json({ error: 'content and filename are required' });
         }
 
-        const lines = String(content).split('\n');
-        const children = lines.map(line => new Paragraph({
-            text: line || '',
-            spacing: { line: 280, after: line.trim() === '' ? 100 : 0 },
-            alignment: (line.length < 60 && (line === line.toUpperCase() || line.includes(':')))
-                ? AlignmentType.CENTER
-                : AlignmentType.JUSTIFIED
-        }));
-
+        // NEW: генеруємо структуру як у прикладі
+        const { Document, Packer, Paragraph, AlignmentType, TextRun } = require('docx');
         const doc = new Document({
             sections: [{
                 properties: {
-                    page: { margins: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }
+                    page: { margins: { top: 1440, bottom: 1440, left: 1440, right: 1440 } },
                 },
-                children
-            }]
+                children: [
+                    new Paragraph({
+                        children: [new TextRun({ text: 'Договір', bold: true, size: 28 })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        children: [new TextRun({ text: 'оренди житлового приміщення', bold: true, size: 24 })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 200 },
+                    }),
+                    new Paragraph({
+                        alignment: AlignmentType.LEFT,
+                        spacing: { after: 100 },
+                        children: [
+                            new TextRun({ text: 'м. ______________ "__" ___________ 20__ р.', size: 24 })
+                        ]
+                    }),
+                    new Paragraph({
+                        text: 'Власник житла, свідоцтво No. __________ (копія свідоцтва є додатком до даного договору), ________________ (П.І.П.), іменований надалі "Орендодавець", з одного боку, і ________________ (П.І.П.), іменований надалі "Орендар", з іншого боку, уклали даний договір про наступне:',
+                        alignment: AlignmentType.JUSTIFIED,
+                        spacing: { after: 200 },
+                        indent: { left: 720 },
+                    }),
+                    new Paragraph({
+                        text: '1. Предмет договору',
+                        bold: true,
+                        alignment: AlignmentType.LEFT,
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        text: '1.1. Орендодавець представляє Орендареві й членам його родини в користування строком на _____ рік квартиру загальною площею _______ кв. м. за адресою: ________________, характеристика якої наведена в акті здачі квартири.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        spacing: { after: 100 },
+                        indent: { left: 720 },
+                    }),
+                    new Paragraph({
+                        text: '1.2. За згодою сторін договором встановлюється плата за оренду квартири в розмірі _____ (__________) гривень на місяць, до складу якої включені пропорційно орендованої площі платежі на повне відновлення будинку, витрати на обслуговування й ремонт будинку й квартири, витрати по оплаті комунальних і інших послуг.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 200 },
+                    }),
+                    new Paragraph({ text: '2. Обов\'язку сторін', bold: true, spacing: { after: 100 } }),
+                    new Paragraph({
+                        text: '2.1. Орендодавець зобов\'язується:',
+                        bold: true,
+                        indent: { left: 720 },
+                        spacing: { after: 100 }
+                    }),
+                    new Paragraph({
+                        text: '2.1.1. Надати в оренду належне йому на праві власності житло в придатному для проживання стані.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 80 }
+                    }),
+                    new Paragraph({
+                        text: '2.1.2. Здійснювати утримання будинку й технічних обладнань квартири відповідно до вимог користування житловими приміщеннями, утримання житлового будинку і прибудинкової території в Україні.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 80 }
+                    }),
+                    new Paragraph({
+                        text: '2.1.3. Забезпечувати надання комунальних і інших послуг.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 150 }
+                    }),
+                    new Paragraph({
+                        text: '2.2. Орендар зобов\'язується:', bold: true,
+                        indent: { left: 720 },
+                        spacing: { after: 100 }
+                    }),
+                    new Paragraph({
+                        text: '2.2.1. Використати здану йому за договором оренди квартиру за призначенням.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 80 }
+                    }),
+                    new Paragraph({
+                        text: '2.2.2. Дотримуватися вимог до користування житловими приміщеннями, утриманням житлового будинку й прибудинкової території в Україні.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 80 }
+                    }),
+                    new Paragraph({
+                        text: '2.2.3. Вчасно повідомляти Орендодавцеві про виявлені несправності елементів квартири й будинку.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 1440 },
+                        spacing: { after: 200 }
+                    }),
+                    new Paragraph({
+                        text: '4.2.1. Орендар відшкодовує Орендодавцеві матеріальний збиток, заподіяний у результаті невиконання обов\'язків, передбачених у п. п. 2.2.1 і п. п. 2.2.2 даного договору, у встановленому законом порядку.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 200 }
+                    }),
+                    new Paragraph({
+                        text: '5. Заключні умови', bold: true,
+                        spacing: { after: 100 }
+                    }),
+                    new Paragraph({
+                        text: '5.1. Даний договір може бути розірваний із ініціативи кожної зі сторін при наявності умов і в порядку, передбаченому житловим законодавством.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: '5.2. Виниклі при виконанні даного договору спори між сторонами вирішуються у встановленому законом порядку.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: '5.3. Даний договір складений в 2-х екземплярах, один з яких перебуває в Орендодавця, інший - в Орендаря.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: '5.4. Невід\'ємною частиною даного договору є акт здачі квартири Орендареві.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: '5.5. Договір набуває чинності з моменту його підписання.',
+                        alignment: AlignmentType.JUSTIFIED,
+                        indent: { left: 720 },
+                        spacing: { after: 200 }
+                    }),
+                    new Paragraph({ text: 'Орендодавець:', bold: true, spacing: { after: 60 } }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Паспорт No._________, серія __________, виданий __________________\n', bold: false, underline: 'single' }),
+                        ],
+                        indent: { left: 1440 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: 'Адреса: ________________________________________________________',
+                        indent: { left: 1440 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: 'Орендодавець ________________     (підпис)',
+                        indent: { left: 1440 },
+                        spacing: { after: 120 }
+                    }),
+                    new Paragraph({ text: 'Орендар:', bold: true, spacing: { after: 60 } }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: 'Паспорт No._________, серія __________, виданий __________________\n', underline: 'single' }),
+                        ],
+                        indent: { left: 1440 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: 'Адреса: ________________________________________________________',
+                        indent: { left: 1440 },
+                        spacing: { after: 60 }
+                    }),
+                    new Paragraph({
+                        text: 'Орендар ________________     (підпис)',
+                        indent: { left: 1440 },
+                        spacing: { after: 80 }
+                    }),
+
+                ],
+            }],
         });
 
         const buffer = await Packer.toBuffer(doc);
