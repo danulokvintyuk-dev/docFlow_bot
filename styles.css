@@ -1107,7 +1107,7 @@ body.modal-open {
     }
     
     .tabs {
-        padding: 12px 0;
+        padding: 0 8px;
         gap: 4px;
         overflow-x: auto;
     }
