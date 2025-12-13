@@ -1322,6 +1322,27 @@ function updateAnalytics() {
     
     // Update chart
     updateIncomeChart();
+
+    // Пошук елемента банера фінансового попередження
+    const alertContainer = document.getElementById('financialAlert');
+    if (alertContainer) {
+        // Отримати дохід минулого місяця
+        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const lastMonthInvoices = appState.invoices.filter(inv => {
+            const invDate = new Date(inv.date);
+            return invDate.getMonth() === lastMonth && invDate.getFullYear() === lastMonthYear;
+        });
+        const lastMonthIncome = lastMonthInvoices.reduce((sum, inv) => sum + inv.total, 0);
+        if (lastMonthIncome > 0 && monthlyIncome < lastMonthIncome * 0.8) {
+            const percentDrop = Math.round((1 - monthlyIncome / lastMonthIncome) * 100);
+            alertContainer.innerHTML = `<div style='background:#fff4e5; border-left:4px solid #f2994a; color:#a25d00; font-weight:500; padding:10px 16px; border-radius:4px;'>⚠️ Дохід впав на ${percentDrop}% цього місяця</div>`;
+            alertContainer.style.display = 'block';
+        } else {
+            alertContainer.innerHTML = '';
+            alertContainer.style.display = 'none';
+        }
+    }
 }
 
 function updateIncomeChart() {

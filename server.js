@@ -5,6 +5,10 @@ const cors = require('cors');
 const { Document, Packer, Paragraph, AlignmentType } = require('docx');
 const stream = require('stream');
 const { Readable } = require('stream');
+const crypto = require('crypto');
+// Merchant credentials for WayForPay
+const WAYFORPAY_MERCHANT_ACCOUNT = 'docflow_bot_onrender_com';
+const WAYFORPAY_SECRET_KEY = 'def425737aa57e5590a82be25a4f51bf27ac1063';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -266,6 +270,23 @@ app.post('/api/send-doc', async (req, res) => {
     } catch (err) {
         console.error('send-doc error:', err.message);
         res.status(500).json({ error: 'failed to send doc' });
+    }
+});
+
+// WayForPay: subscription link
+app.post('/api/create-subscription-link', async (req, res) => {
+    try {
+        const orderReference = 'subscr_' + Date.now();
+        const amount = 7; // $7 per month (або змініть на грн)
+        const currency = 'USD'; // або 'UAH'
+        const returnUrl = 'https://docflow-bot.onrender.com/?subscription-success';
+        
+        // Спрощена форма: генеруємо базовий pay url (у продакшн підпис і схема складніша, див. WayForPay docs)
+        const payUrl = `https://secure.wayforpay.com/pay?merchantAccount=${WAYFORPAY_MERCHANT_ACCOUNT}&orderReference=${orderReference}&amount=${amount}&currency=${currency}&returnUrl=${encodeURIComponent(returnUrl)}&productName=DocFlow%20PRO%20Subscription&productPrice=${amount}&productCount=1`;
+
+        return res.json({ url: payUrl });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
