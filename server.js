@@ -290,6 +290,32 @@ app.post('/api/create-subscription-link', async (req, res) => {
     }
 });
 
+// Temporary in-memory store (for demo)
+const userSubscriptions = {};
+
+// WayForPay payment callback/webhook
+app.post('/api/wayforpay-callback', (req, res) => {
+    const body = req.body;
+    // WayForPay відправляє user дані через customerEmail, orderReference, etc.
+    const userEmail = body.customerEmail;
+    const reference = body.orderReference;
+    const status = body.transactionStatus;
+    const now = new Date();
+
+    // ПРО: якщо статус success — даємо PRO на місяць
+    if (status === 'Approved' || status === 'SuccessfullyProcessed') {
+        if (userEmail) {
+            userSubscriptions[userEmail] = {
+                plan: 'pro',
+                start: now,
+                end: new Date(now.getTime() + 30*24*60*60*1000)
+            };
+            console.log(`Підписка PRO активована для ${userEmail}`);
+        }
+    }
+    res.json({ status: 'ok' });
+});
+
 // Webhook endpoint for Telegram
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {
     bot.processUpdate(req.body);
