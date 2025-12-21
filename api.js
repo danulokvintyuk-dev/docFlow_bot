@@ -146,6 +146,111 @@ class RailwayAPI {
             return { objectId: `local_${Date.now()}` };
         }
     }
+
+    // Financial Transactions (Income/Expenses)
+    async loadTransactions() {
+        try {
+            const result = await this.request(`/transactions?userId=${this.userId}`);
+            return result?.data || [];
+        } catch (error) {
+            console.warn('Failed to load transactions:', error);
+            return [];
+        }
+    }
+
+    async saveTransaction(transaction) {
+        try {
+            const data = {
+                ...transaction,
+                userId: this.userId
+            };
+            const result = await this.request('/transactions', 'POST', data);
+            return result?.data || { objectId: `local_${Date.now()}` };
+        } catch (error) {
+            console.warn('Failed to save transaction:', error);
+            return { objectId: `local_${Date.now()}` };
+        }
+    }
+
+    async deleteTransaction(transactionId) {
+        try {
+            const result = await this.request(`/transactions/${transactionId}`, 'DELETE');
+            return result?.success || false;
+        } catch (error) {
+            console.warn('Failed to delete transaction:', error);
+            return false;
+        }
+    }
+
+    // Categories
+    async loadCategories() {
+        try {
+            const result = await this.request(`/categories?userId=${this.userId}`);
+            return result?.data || [];
+        } catch (error) {
+            console.warn('Failed to load categories:', error);
+            return [];
+        }
+    }
+
+    async saveCategory(category) {
+        try {
+            const data = {
+                ...category,
+                userId: this.userId
+            };
+            const result = await this.request('/categories', 'POST', data);
+            return result?.data || { objectId: `local_${Date.now()}` };
+        } catch (error) {
+            console.warn('Failed to save category:', error);
+            return { objectId: `local_${Date.now()}` };
+        }
+    }
+
+    async deleteCategory(categoryId) {
+        try {
+            const result = await this.request(`/categories/${categoryId}`, 'DELETE');
+            return result?.success || false;
+        } catch (error) {
+            console.warn('Failed to delete category:', error);
+            return false;
+        }
+    }
+
+    // Payment Reminders
+    async loadReminders() {
+        try {
+            const result = await this.request(`/reminders?userId=${this.userId}`);
+            return result?.data || [];
+        } catch (error) {
+            console.warn('Failed to load reminders:', error);
+            return [];
+        }
+    }
+
+    async saveReminder(reminder) {
+        try {
+            const data = {
+                ...reminder,
+                userId: this.userId
+            };
+            const result = await this.request('/reminders', 'POST', data);
+            return result?.data || { objectId: `local_${Date.now()}` };
+        } catch (error) {
+            console.warn('Failed to save reminder:', error);
+            return { objectId: `local_${Date.now()}` };
+        }
+    }
+
+    async deleteReminder(reminderId) {
+        try {
+            const result = await this.request(`/reminders/${reminderId}`, 'DELETE');
+            return result?.success || false;
+        } catch (error) {
+            console.warn('Failed to delete reminder:', error);
+            return false;
+        }
+    }
 }
 
 // Створюємо глобальний екземпляр API

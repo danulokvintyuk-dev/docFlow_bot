@@ -50,7 +50,7 @@
             <button class="tab-btn active" data-tab="contracts">Договори</button>
             <button class="tab-btn" data-tab="invoices">Рахунки</button>
             <button class="tab-btn" data-tab="analytics">Аналітика</button>
-            <button class="tab-btn" data-tab="signing">Підписання</button>
+            <button class="tab-btn" data-tab="finance">Фінанси</button>
             <button class="tab-btn" data-tab="subscription">Підписка</button>
         </nav>
 
@@ -466,39 +466,191 @@
                 </div>
             </div>
 
-            <!-- Signing Tab -->
-            <div class="tab-content" id="signing">
+            <!-- Finance Tab -->
+            <div class="tab-content" id="finance">
                 <div class="hero-section">
-                    <h2>Підписання документів</h2>
-                    <p class="hero-description">Відправляйте документи на електронне підписання. Безпечне посилання для контрагентів з підтвердженням через SMS або email.</p>
+                    <h2>Особистий фінансовий кабінет</h2>
+                    <p class="hero-description">Облік грошей та витрат. Відстежуйте доходи, витрати, категорії та нагадування про платежі. Генеруйте звіти для аналізу.</p>
                 </div>
 
-                <div class="signing-options">
-                    <div class="signing-card">
-                        <h3>Відправити на підпис</h3>
-                        <p>Завантажте документ та створіть посилання для підписання контрагентом</p>
-                        <input type="file" id="documentUpload" accept=".pdf" style="display: none;">
-                        <button class="btn-primary" onclick="document.getElementById('documentUpload').click()">
-                            Обрати документ PDF
-                        </button>
+                <!-- Financial Summary Cards -->
+                <div class="analytics-cards" style="margin-bottom: 24px;">
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <div class="card-label" style="color: rgba(255,255,255,0.9);">Баланс</div>
+                        <div class="card-value" id="totalBalance" style="color: white;">0 ₴</div>
                     </div>
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                        <div class="card-label" style="color: rgba(255,255,255,0.9);">Доходи (міс.)</div>
+                        <div class="card-value" id="monthlyIncome" style="color: white;">0 ₴</div>
+                    </div>
+                    <div class="analytics-card" style="background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%); color: white;">
+                        <div class="card-label" style="color: rgba(255,255,255,0.9);">Витрати (міс.)</div>
+                        <div class="card-value" id="monthlyExpenses" style="color: white;">0 ₴</div>
+                    </div>
+                </div>
 
-                    <div class="signing-card">
-                        <h3>Створити посилання для підпису</h3>
-                        <p>Введіть email контрагента та згенеруйте безпечне посилання</p>
+                <!-- Quick Actions -->
+                <div class="section-header" style="flex-wrap: wrap; gap: 8px;">
+                    <button class="btn-primary" id="newIncomeBtn" style="flex: 1; min-width: 100px;">+ Дохід</button>
+                    <button class="btn-secondary" id="newExpenseBtn" style="flex: 1; min-width: 100px;">+ Витрата</button>
+                    <button class="btn-secondary" id="newReminderBtn" style="flex: 1; min-width: 100px;">+ Нагадування</button>
+                </div>
+
+                <!-- Transactions List -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h3 style="margin: 0; font-size: 18px;">Останні операції</h3>
+                    <select id="transactionFilter" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: var(--bg-card); color: var(--text-primary);">
+                        <option value="all">Всі</option>
+                        <option value="income">Доходи</option>
+                        <option value="expense">Витрати</option>
+                    </select>
+                </div>
+                <div class="documents-list" id="transactionsList">
+                    <!-- Transactions will appear here -->
+                </div>
+
+                <!-- Categories Section -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h3 style="margin: 0; font-size: 18px;">Категорії</h3>
+                    <button class="btn-secondary" id="manageCategoriesBtn">Керувати</button>
+                </div>
+                <div class="categories-grid" id="categoriesGrid">
+                    <!-- Categories will appear here -->
+                </div>
+
+                <!-- Reminders Section -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h3 style="margin: 0; font-size: 18px;">Нагадування про платежі</h3>
+                </div>
+                <div class="reminders-list" id="remindersList">
+                    <!-- Reminders will appear here -->
+                </div>
+
+                <!-- Reports Section -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h3 style="margin: 0; font-size: 18px;">Звіти</h3>
+                    <button class="btn-secondary" id="generateReportBtn">Створити звіт</button>
+                </div>
+                <div class="reports-options" id="reportsOptions">
+                    <button class="report-btn" data-period="week">Тиждень</button>
+                    <button class="report-btn" data-period="month">Місяць</button>
+                    <button class="report-btn" data-period="quarter">Квартал</button>
+                    <button class="report-btn" data-period="year">Рік</button>
+                </div>
+            </div>
+
+            <!-- Transaction Modal -->
+            <div class="modal" id="transactionModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="transactionModalTitle">Нова операція</h3>
+                        <button class="close-btn" id="closeTransactionModal">&times;</button>
+                    </div>
+                    <form id="transactionForm">
                         <div class="form-group">
-                            <label>Email контрагента</label>
-                            <input type="email" id="signerEmail" placeholder="partner@company.com">
+                            <label>Тип операції</label>
+                            <select id="transactionType" required>
+                                <option value="income">Дохід</option>
+                                <option value="expense">Витрата</option>
+                            </select>
                         </div>
-                        <button class="btn-primary" id="generateSignLinkBtn">Згенерувати посилання</button>
-                    </div>
+                        <div class="form-group">
+                            <label>Сума (₴)</label>
+                            <input type="number" id="transactionAmount" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Категорія</label>
+                            <select id="transactionCategory" required>
+                                <option value="">Оберіть категорію...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Опис</label>
+                            <input type="text" id="transactionDescription" placeholder="Короткий опис операції">
+                        </div>
+                        <div class="form-group">
+                            <label>Дата</label>
+                            <input type="date" id="transactionDate" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="cancelTransactionBtn">Скасувати</button>
+                            <button type="submit" class="btn-primary">Зберегти</button>
+                        </div>
+                    </form>
                 </div>
+            </div>
 
-                <div class="pending-signatures" id="pendingSignatures">
-                    <h3>Очікують підпису</h3>
-                    <div class="signatures-list" id="signaturesList">
-                        <!-- Pending signatures will appear here -->
+            <!-- Reminder Modal -->
+            <div class="modal" id="reminderModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="reminderModalTitle">Нове нагадування</h3>
+                        <button class="close-btn" id="closeReminderModal">&times;</button>
                     </div>
+                    <form id="reminderForm">
+                        <div class="form-group">
+                            <label>Назва платежу</label>
+                            <input type="text" id="reminderTitle" placeholder="Наприклад: Оренда квартири" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Сума (₴)</label>
+                            <input type="number" id="reminderAmount" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Дата платежу</label>
+                            <input type="date" id="reminderDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Категорія</label>
+                            <select id="reminderCategory">
+                                <option value="">Оберіть категорію...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Періодичність</label>
+                            <select id="reminderRecurrence">
+                                <option value="once">Одноразово</option>
+                                <option value="monthly">Щомісяця</option>
+                                <option value="quarterly">Щокварталу</option>
+                                <option value="yearly">Щороку</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="cancelReminderBtn">Скасувати</button>
+                            <button type="submit" class="btn-primary">Зберегти</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Category Modal -->
+            <div class="modal" id="categoryModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="categoryModalTitle">Нова категорія</h3>
+                        <button class="close-btn" id="closeCategoryModal">&times;</button>
+                    </div>
+                    <form id="categoryForm">
+                        <div class="form-group">
+                            <label>Назва категорії</label>
+                            <input type="text" id="categoryName" placeholder="Наприклад: Продукти" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Тип</label>
+                            <select id="categoryType" required>
+                                <option value="income">Дохід</option>
+                                <option value="expense">Витрата</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Колір</label>
+                            <input type="color" id="categoryColor" value="#667eea">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="cancelCategoryBtn">Скасувати</button>
+                            <button type="submit" class="btn-primary">Зберегти</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

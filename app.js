@@ -55,7 +55,10 @@ const appState = {
     invoices: [],
     documents: [],
     income: [],
-    taxSystem: 'single'
+    taxSystem: 'single',
+    transactions: [],
+    categories: [],
+    reminders: []
 };
 
 // Prevent double-close glitches on modal hide animation
@@ -69,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeContracts();
     initializeInvoices();
     initializeAnalytics();
-    initializeSigning();
+    initializeFinance();
     initializeSubscription();
     updateSubscriptionBadge();
     // Initialize flatpickr for mobile/webview if needed (fix oversized native date controls)
@@ -119,11 +122,14 @@ async function loadAppState() {
 
     // Спробуємо синхронізувати з Back4App (опціонально)
     try {
-        const [contracts, invoices, documents, settings] = await Promise.all([
+        const [contracts, invoices, documents, settings, transactions, categories, reminders] = await Promise.all([
             api.loadContracts().catch(() => []),
             api.loadInvoices().catch(() => []),
             api.loadDocuments().catch(() => []),
-            api.loadUserSettings().catch(() => null)
+            api.loadUserSettings().catch(() => null),
+            api.loadTransactions().catch(() => []),
+            api.loadCategories().catch(() => []),
+            api.loadReminders().catch(() => [])
         ]);
 
         // Об'єднуємо дані: localStorage має пріоритет
@@ -132,6 +138,24 @@ async function loadAppState() {
         }
         if (invoices.length > 0) {
             console.log(`📥 Синхронізовано ${invoices.length} рахунків з Back4App`);
+        }
+        if (transactions.length > 0) {
+            console.log(`📥 Синхронізовано ${transactions.length} транзакцій з Back4App`);
+            if (appState.transactions.length === 0) {
+                appState.transactions = transactions;
+            }
+        }
+        if (categories.length > 0) {
+            console.log(`📥 Синхронізовано ${categories.length} категорій з Back4App`);
+            if (appState.categories.length === 0) {
+                appState.categories = categories;
+            }
+        }
+        if (reminders.length > 0) {
+            console.log(`📥 Синхронізовано ${reminders.length} нагадувань з Back4App`);
+            if (appState.reminders.length === 0) {
+                appState.reminders = reminders;
+            }
         }
 
         if (settings) {
@@ -1035,7 +1059,7 @@ function initializeInvoices() {
 
 function closeAllModals() {
     document.body.classList.remove('modal-open');
-    ['invoiceModal', 'contractModal'].forEach(id => {
+    ['invoiceModal', 'contractModal', 'transactionModal', 'reminderModal', 'categoryModal'].forEach(id => {
         const modal = document.getElementById(id);
         if (modal) {
             modal.classList.remove('active');
@@ -1411,85 +1435,601 @@ function exportToExcel() {
     tg.showAlert('Дані експортовано у CSV файл!');
 }
 
-// Initialize Signing
-function initializeSigning() {
-    document.getElementById('generateSignLinkBtn').addEventListener('click', generateSignLink);
-    document.getElementById('documentUpload').addEventListener('change', handleDocumentUpload);
-    renderPendingSignatures();
+// Initialize Finance
+function initializeFinance() {
+    // Initialize default categories if none exist
+    if (appState.categories.length === 0) {
+        appState.categories = [
+            { id: 'cat_1', name: 'Зарплата', type: 'income', color: '#11998e' },
+            { id: 'cat_2', name: 'Фриланс', type: 'income', color: '#38ef7d' },
+            { id: 'cat_3', name: 'Продукти', type: 'expense', color: '#ee0979' },
+            { id: 'cat_4', name: 'Транспорт', type: 'expense', color: '#ff6a00' },
+            { id: 'cat_5', name: 'Комунальні', type: 'expense', color: '#f093fb' },
+            { id: 'cat_6', name: 'Розваги', type: 'expense', color: '#f5576c' }
+        ];
+        saveAppStateToLocal();
+    }
+
+    // Transaction buttons
+    document.getElementById('newIncomeBtn').addEventListener('click', () => openTransactionModal('income'));
+    document.getElementById('newExpenseBtn').addEventListener('click', () => openTransactionModal('expense'));
+    document.getElementById('newReminderBtn').addEventListener('click', openReminderModal);
+    document.getElementById('manageCategoriesBtn').addEventListener('click', openCategoryModal);
+    document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+
+    // Transaction modal handlers
+    document.getElementById('closeTransactionModal').addEventListener('click', closeTransactionModal);
+    document.getElementById('cancelTransactionBtn').addEventListener('click', closeTransactionModal);
+    document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
+    document.getElementById('transactionType').addEventListener('change', (e) => {
+        updateCategoryOptions(e.target.value);
+    });
+
+    // Reminder modal handlers
+    document.getElementById('closeReminderModal').addEventListener('click', closeReminderModal);
+    document.getElementById('cancelReminderBtn').addEventListener('click', closeReminderModal);
+    document.getElementById('reminderForm').addEventListener('submit', handleReminderSubmit);
+
+    // Category modal handlers
+    document.getElementById('closeCategoryModal').addEventListener('click', closeCategoryModal);
+    document.getElementById('cancelCategoryBtn').addEventListener('click', closeCategoryModal);
+    document.getElementById('categoryForm').addEventListener('submit', handleCategorySubmit);
+
+    // Filter
+    document.getElementById('transactionFilter').addEventListener('change', renderTransactionsList);
+
+    // Report buttons
+    document.querySelectorAll('.report-btn').forEach(btn => {
+        btn.addEventListener('click', () => generateReport(btn.dataset.period));
+    });
+
+    // Set default date to today
+    document.getElementById('transactionDate').valueAsDate = new Date();
+    document.getElementById('reminderDate').valueAsDate = new Date();
+
+    // Modal background click handlers
+    const transactionModal = document.getElementById('transactionModal');
+    if (transactionModal) {
+        transactionModal.addEventListener('click', (e) => {
+            if (e.target === transactionModal) closeTransactionModal();
+        });
+    }
+
+    const reminderModal = document.getElementById('reminderModal');
+    if (reminderModal) {
+        reminderModal.addEventListener('click', (e) => {
+            if (e.target === reminderModal) closeReminderModal();
+        });
+    }
+
+    const categoryModal = document.getElementById('categoryModal');
+    if (categoryModal) {
+        categoryModal.addEventListener('click', (e) => {
+            if (e.target === categoryModal) closeCategoryModal();
+        });
+    }
+
+    // Initial render
+    renderTransactionsList();
+    renderCategories();
+    renderReminders();
+    updateFinanceSummary();
+    
+    // Check reminders every hour
+    checkReminders();
+    setInterval(checkReminders, 60 * 60 * 1000); // Check every hour
 }
 
-function handleDocumentUpload(e) {
-    const file = e.target.files[0];
-    if (file) {
-        tg.showAlert('Документ завантажено! Тепер введіть email контрагента та згенеруйте посилання.');
-    }
+function openTransactionModal(type = 'income') {
+    const modal = document.getElementById('transactionModal');
+    const form = document.getElementById('transactionForm');
+    const title = document.getElementById('transactionModalTitle');
+    
+    form.reset();
+    document.getElementById('transactionType').value = type;
+    document.getElementById('transactionDate').valueAsDate = new Date();
+    title.textContent = type === 'income' ? 'Новий дохід' : 'Нова витрата';
+    
+    updateCategoryOptions(type);
+    
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('active');
+        document.body.classList.add('modal-open');
+    }, 10);
 }
 
-async function generateSignLink() {
-    const email = document.getElementById('signerEmail').value;
-    if (!email) {
-        tg.showAlert('Будь ласка, введіть email контрагента');
-        return;
-    }
+function closeTransactionModal() {
+    const modal = document.getElementById('transactionModal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }, 150);
+}
+
+function openReminderModal() {
+    const modal = document.getElementById('reminderModal');
+    const form = document.getElementById('reminderForm');
     
-    if (appState.subscription === 'free') {
-        tg.showAlert('Підписання документів доступне тільки в платних пакетах. Оновіть підписку!');
-        return;
-    }
+    form.reset();
+    document.getElementById('reminderDate').valueAsDate = new Date();
+    updateReminderCategoryOptions();
     
-    const linkId = Date.now().toString();
-    const signLink = {
-        id: linkId,
-        email: email,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        documentName: 'Документ.pdf'
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('active');
+        document.body.classList.add('modal-open');
+    }, 10);
+}
+
+function closeReminderModal() {
+    const modal = document.getElementById('reminderModal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }, 150);
+}
+
+function openCategoryModal() {
+    const modal = document.getElementById('categoryModal');
+    const form = document.getElementById('categoryForm');
+    
+    form.reset();
+    
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('active');
+        document.body.classList.add('modal-open');
+    }, 10);
+}
+
+function closeCategoryModal() {
+    const modal = document.getElementById('categoryModal');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }, 150);
+}
+
+function updateCategoryOptions(type) {
+    const select = document.getElementById('transactionCategory');
+    select.innerHTML = '<option value="">Оберіть категорію...</option>';
+    
+    const categories = appState.categories.filter(cat => cat.type === type);
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        select.appendChild(option);
+    });
+}
+
+function updateReminderCategoryOptions() {
+    const select = document.getElementById('reminderCategory');
+    select.innerHTML = '<option value="">Оберіть категорію...</option>';
+    
+    appState.categories.filter(cat => cat.type === 'expense').forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        select.appendChild(option);
+    });
+}
+
+async function handleTransactionSubmit(e) {
+    e.preventDefault();
+    
+    const transaction = {
+        id: `trans_${Date.now()}`,
+        type: document.getElementById('transactionType').value,
+        amount: parseFloat(document.getElementById('transactionAmount').value),
+        categoryId: document.getElementById('transactionCategory').value,
+        description: document.getElementById('transactionDescription').value,
+        date: document.getElementById('transactionDate').value,
+        createdAt: new Date().toISOString()
     };
     
-    appState.documents.push(signLink);
-    
-    // Зберігаємо в localStorage (основний спосіб)
+    appState.transactions.push(transaction);
     await saveAppState();
     
-    // Спробуємо синхронізувати з Back4App (опціонально, у фоні)
     try {
-        await api.saveDocument(signLink);
+        await api.saveTransaction(transaction);
     } catch (error) {
-        // Не критично - дані вже в localStorage
-        console.debug('Back4App sync failed (не критично):', error.message);
+        console.debug('API sync failed:', error.message);
     }
-    const signUrl = `https://yourdomain.com/sign/${linkId}`;
-    tg.showAlert(`Посилання згенеровано:\n${signUrl}\n\nВідправте його контрагента для підписання.`);
     
-    document.getElementById('signerEmail').value = '';
-    renderPendingSignatures();
+    closeTransactionModal();
+    renderTransactionsList();
+    updateFinanceSummary();
+    tg.showAlert('Операцію збережено!');
 }
 
-function renderPendingSignatures() {
-    const list = document.getElementById('signaturesList');
+async function handleReminderSubmit(e) {
+    e.preventDefault();
+    
+    const reminder = {
+        id: `rem_${Date.now()}`,
+        title: document.getElementById('reminderTitle').value,
+        amount: parseFloat(document.getElementById('reminderAmount').value),
+        date: document.getElementById('reminderDate').value,
+        categoryId: document.getElementById('reminderCategory').value || null,
+        recurrence: document.getElementById('reminderRecurrence').value,
+        createdAt: new Date().toISOString(),
+        notified: false
+    };
+    
+    appState.reminders.push(reminder);
+    await saveAppState();
+    
+    try {
+        await api.saveReminder(reminder);
+        // Schedule notification
+        await scheduleReminderNotification(reminder);
+    } catch (error) {
+        console.debug('API sync failed:', error.message);
+    }
+    
+    closeReminderModal();
+    renderReminders();
+    tg.showAlert('Нагадування створено! Сповіщення прийде в бота.');
+}
+
+// Schedule reminder notification
+async function scheduleReminderNotification(reminder) {
+    try {
+        const chatId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        if (!chatId) return;
+        
+        await fetch(`https://docflow-bot.onrender.com/api/schedule-reminder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': api.userId
+            },
+            body: JSON.stringify({
+                reminderId: reminder.id,
+                chatId: chatId,
+                title: reminder.title,
+                amount: reminder.amount,
+                date: reminder.date,
+                recurrence: reminder.recurrence
+            })
+        });
+    } catch (error) {
+        console.debug('Failed to schedule reminder:', error.message);
+    }
+}
+
+// Check reminders daily and send notifications
+function checkReminders() {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    appState.reminders.forEach(async (reminder) => {
+        const reminderDate = reminder.date.split('T')[0];
+        const daysUntil = Math.ceil((new Date(reminderDate) - now) / (1000 * 60 * 60 * 24));
+        
+        // Send notification 1 day before and on the day
+        if ((daysUntil === 1 || daysUntil === 0) && !reminder.notified) {
+            await sendReminderNotification(reminder);
+            reminder.notified = true;
+            await saveAppState();
+        }
+    });
+}
+
+// Send reminder notification via Telegram
+async function sendReminderNotification(reminder) {
+    try {
+        const chatId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        if (!chatId) return;
+        
+        const category = reminder.categoryId ? appState.categories.find(c => c.id === reminder.categoryId) : null;
+        const daysUntil = Math.ceil((new Date(reminder.date) - new Date()) / (1000 * 60 * 60 * 24));
+        
+        let message = `🔔 Нагадування про платіж\n\n`;
+        message += `📌 ${reminder.title}\n`;
+        message += `💰 Сума: ${reminder.amount.toFixed(2)} ₴\n`;
+        message += `📅 Дата: ${formatDate(reminder.date)}\n`;
+        if (category) {
+            message += `🏷️ Категорія: ${category.name}\n`;
+        }
+        if (daysUntil === 0) {
+            message += `\n⚠️ Платіж сьогодні!`;
+        } else {
+            message += `\n⏰ Залишилось ${daysUntil} дн.`;
+        }
+        
+        await fetch(`https://docflow-bot.onrender.com/api/send-notification`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': api.userId
+            },
+            body: JSON.stringify({
+                chatId: chatId,
+                message: message
+            })
+        });
+    } catch (error) {
+        console.debug('Failed to send reminder notification:', error.message);
+    }
+}
+
+async function handleCategorySubmit(e) {
+    e.preventDefault();
+    
+    const category = {
+        id: `cat_${Date.now()}`,
+        name: document.getElementById('categoryName').value,
+        type: document.getElementById('categoryType').value,
+        color: document.getElementById('categoryColor').value,
+        createdAt: new Date().toISOString()
+    };
+    
+    appState.categories.push(category);
+    await saveAppState();
+    
+    try {
+        await api.saveCategory(category);
+    } catch (error) {
+        console.debug('API sync failed:', error.message);
+    }
+    
+    closeCategoryModal();
+    renderCategories();
+    tg.showAlert('Категорію створено!');
+}
+
+function renderTransactionsList() {
+    const list = document.getElementById('transactionsList');
     if (!list) return;
     
-    const pending = appState.documents.filter(doc => doc.status === 'pending');
+    const filter = document.getElementById('transactionFilter').value;
+    let transactions = appState.transactions;
     
-    if (pending.length === 0) {
-        list.innerHTML = '<p style="color: var(--tg-theme-hint-color); text-align: center; padding: 20px;">Немає документів, що очікують підпису</p>';
+    if (filter !== 'all') {
+        transactions = transactions.filter(t => t.type === filter);
+    }
+    
+    transactions = transactions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
+    
+    if (transactions.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Операцій ще немає. Додайте першу операцію!</p>';
         return;
     }
     
-    list.innerHTML = pending.map(doc => `
-        <div class="signature-item">
-            <div>
-                <strong>${doc.documentName}</strong>
-                <p style="font-size: 12px; color: var(--tg-theme-hint-color); margin-top: 5px;">
-                    ${doc.email} • ${formatDate(doc.createdAt)}
-                </p>
+    list.innerHTML = transactions.map(trans => {
+        const category = appState.categories.find(c => c.id === trans.categoryId);
+        const isIncome = trans.type === 'income';
+        const sign = isIncome ? '+' : '-';
+        const color = isIncome ? '#11998e' : '#ee0979';
+        
+        return `
+            <div class="document-item">
+                <div class="document-info">
+                    <h4 style="color: ${color};">${sign} ${trans.amount.toFixed(2)} ₴</h4>
+                    <p>${category ? category.name : 'Без категорії'} • ${trans.description || 'Без опису'} • ${formatDate(trans.date)}</p>
+                </div>
+                <div class="document-actions">
+                    <button class="btn-secondary" onclick="deleteTransaction('${trans.id}')">Видалити</button>
+                </div>
             </div>
-            <span style="padding: 4px 12px; background: var(--warning-color); border-radius: 12px; font-size: 12px;">
-                Очікує
-            </span>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
+
+function renderCategories() {
+    const grid = document.getElementById('categoriesGrid');
+    if (!grid) return;
+    
+    const incomeCategories = appState.categories.filter(c => c.type === 'income');
+    const expenseCategories = appState.categories.filter(c => c.type === 'expense');
+    
+    grid.innerHTML = `
+        <div style="grid-column: 1/-1; margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 16px; color: var(--text-primary);">Доходи</h4>
+        </div>
+        ${incomeCategories.map(cat => `
+            <div class="category-card" style="background: ${cat.color}20; border-left: 4px solid ${cat.color};">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background: ${cat.color};"></div>
+                    <span style="font-weight: 500;">${cat.name}</span>
+                </div>
+            </div>
+        `).join('')}
+        <div style="grid-column: 1/-1; margin-top: 24px; margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 16px; color: var(--text-primary);">Витрати</h4>
+        </div>
+        ${expenseCategories.map(cat => `
+            <div class="category-card" style="background: ${cat.color}20; border-left: 4px solid ${cat.color};">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; background: ${cat.color};"></div>
+                    <span style="font-weight: 500;">${cat.name}</span>
+                </div>
+            </div>
+        `).join('')}
+    `;
+}
+
+function renderReminders() {
+    const list = document.getElementById('remindersList');
+    if (!list) return;
+    
+    const upcoming = appState.reminders
+        .filter(r => new Date(r.date) >= new Date())
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(0, 10);
+    
+    if (upcoming.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">Нагадувань немає. Створіть перше нагадування!</p>';
+        return;
+    }
+    
+    list.innerHTML = upcoming.map(rem => {
+        const category = rem.categoryId ? appState.categories.find(c => c.id === rem.categoryId) : null;
+        const daysUntil = Math.ceil((new Date(rem.date) - new Date()) / (1000 * 60 * 60 * 24));
+        const isOverdue = daysUntil < 0;
+        
+        return `
+            <div class="document-item" style="${isOverdue ? 'border-left: 4px solid #ee0979;' : ''}">
+                <div class="document-info">
+                    <h4>${rem.title}</h4>
+                    <p>${rem.amount.toFixed(2)} ₴ • ${category ? category.name : 'Без категорії'} • ${formatDate(rem.date)}</p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                        ${isOverdue ? `⚠️ Прострочено на ${Math.abs(daysUntil)} дн.` : `⏰ Залишилось ${daysUntil} дн.`} • ${rem.recurrence === 'monthly' ? 'Щомісяця' : rem.recurrence === 'quarterly' ? 'Щокварталу' : rem.recurrence === 'yearly' ? 'Щороку' : 'Одноразово'}
+                    </p>
+                </div>
+                <div class="document-actions">
+                    <button class="btn-secondary" onclick="deleteReminder('${rem.id}')">Видалити</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateFinanceSummary() {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const monthlyTransactions = appState.transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+    });
+    
+    const monthlyIncome = monthlyTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    const monthlyExpenses = monthlyTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalBalance = appState.transactions.reduce((sum, t) => {
+        return sum + (t.type === 'income' ? t.amount : -t.amount);
+    }, 0);
+    
+    document.getElementById('totalBalance').textContent = totalBalance.toFixed(2) + ' ₴';
+    document.getElementById('monthlyIncome').textContent = monthlyIncome.toFixed(2) + ' ₴';
+    document.getElementById('monthlyExpenses').textContent = monthlyExpenses.toFixed(2) + ' ₴';
+}
+
+async function generateReport(period = 'month') {
+    const now = new Date();
+    let startDate, endDate;
+    
+    switch(period) {
+        case 'week':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
+            endDate = now;
+            break;
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            break;
+        case 'quarter':
+            const quarter = Math.floor(now.getMonth() / 3);
+            startDate = new Date(now.getFullYear(), quarter * 3, 1);
+            endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
+            break;
+        case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            endDate = new Date(now.getFullYear(), 11, 31);
+            break;
+    }
+    
+    const reportTransactions = appState.transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate >= startDate && tDate <= endDate;
+    });
+    
+    const income = reportTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expenses = reportTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balance = income - expenses;
+    
+    // Group by category
+    const categoryStats = {};
+    reportTransactions.forEach(t => {
+        const catId = t.categoryId || 'uncategorized';
+        if (!categoryStats[catId]) {
+            categoryStats[catId] = { income: 0, expense: 0 };
+        }
+        if (t.type === 'income') {
+            categoryStats[catId].income += t.amount;
+        } else {
+            categoryStats[catId].expense += t.amount;
+        }
+    });
+    
+    let report = `ФІНАНСОВИЙ ЗВІТ\n`;
+    report += `Період: ${formatDate(startDate.toISOString())} - ${formatDate(endDate.toISOString())}\n\n`;
+    report += `ДОХОДИ: ${income.toFixed(2)} ₴\n`;
+    report += `ВИТРАТИ: ${expenses.toFixed(2)} ₴\n`;
+    report += `БАЛАНС: ${balance.toFixed(2)} ₴\n\n`;
+    report += `СТАТИСТИКА ПО КАТЕГОРІЯХ:\n`;
+    report += `${'-'.repeat(50)}\n`;
+    
+    Object.keys(categoryStats).forEach(catId => {
+        const cat = appState.categories.find(c => c.id === catId);
+        const stats = categoryStats[catId];
+        const total = stats.income - stats.expense;
+        if (total !== 0) {
+            report += `${cat ? cat.name : 'Без категорії'}: ${total > 0 ? '+' : ''}${total.toFixed(2)} ₴\n`;
+        }
+    });
+    
+    // Generate DOCX instead of TXT
+    const filename = `Звіт_${period}_${new Date().toISOString().split('T')[0]}.docx`;
+    
+    // Try to send via Telegram first, then fallback to download
+    if (window.Telegram?.WebApp) {
+        const sent = await sendDocToTelegram(report, filename);
+        if (sent) {
+            tg.showAlert(`Звіт за ${period === 'week' ? 'тиждень' : period === 'month' ? 'місяць' : period === 'quarter' ? 'квартал' : 'рік'} відправлено у Telegram!`);
+            return;
+        }
+    }
+    
+    // Fallback: generate DOCX locally
+    await createAndDownloadDocx(report, filename);
+    tg.showAlert(`Звіт за ${period === 'week' ? 'тиждень' : period === 'month' ? 'місяць' : period === 'quarter' ? 'квартал' : 'рік'} згенеровано!`);
+}
+
+window.deleteTransaction = async function(id) {
+    if (!confirm('Видалити цю операцію?')) return;
+    
+    appState.transactions = appState.transactions.filter(t => t.id !== id);
+    await saveAppState();
+    
+    try {
+        await api.deleteTransaction(id);
+    } catch (error) {
+        console.debug('API delete failed:', error.message);
+    }
+    
+    renderTransactionsList();
+    updateFinanceSummary();
+};
+
+window.deleteReminder = async function(id) {
+    if (!confirm('Видалити це нагадування?')) return;
+    
+    appState.reminders = appState.reminders.filter(r => r.id !== id);
+    await saveAppState();
+    
+    try {
+        await api.deleteReminder(id);
+    } catch (error) {
+        console.debug('API delete failed:', error.message);
+    }
+    
+    renderReminders();
+};
 
 // Initialize Subscription
 function initializeSubscription() {

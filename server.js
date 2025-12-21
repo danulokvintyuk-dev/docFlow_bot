@@ -273,6 +273,68 @@ app.post('/api/send-doc', async (req, res) => {
     }
 });
 
+// Send notification to Telegram user
+app.post('/api/send-notification', async (req, res) => {
+    try {
+        const { chatId, message } = req.body || {};
+        if (!chatId || !message) {
+            return res.status(400).json({ error: 'chatId and message are required' });
+        }
+
+        await bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('send-notification error:', err.message);
+        res.status(500).json({ error: 'failed to send notification' });
+    }
+});
+
+// Schedule reminder notification
+app.post('/api/schedule-reminder', async (req, res) => {
+    try {
+        const { reminderId, chatId, title, amount, date, recurrence } = req.body || {};
+        if (!chatId || !date) {
+            return res.status(400).json({ error: 'chatId and date are required' });
+        }
+
+        // Calculate when to send notification (1 day before)
+        const reminderDate = new Date(date);
+        const notificationDate = new Date(reminderDate);
+        notificationDate.setDate(notificationDate.getDate() - 1);
+        const now = new Date();
+        const delay = notificationDate.getTime() - now.getTime();
+
+        if (delay > 0) {
+            setTimeout(async () => {
+                try {
+                    const message = `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 Дата: ${new Date(date).toLocaleDateString('uk-UA')}\n\n⏰ Платіж завтра!`;
+                    await bot.sendMessage(chatId, message);
+                } catch (err) {
+                    console.error('Scheduled reminder error:', err.message);
+                }
+            }, delay);
+        }
+
+        // Also send notification on the day
+        const dayDelay = reminderDate.getTime() - now.getTime();
+        if (dayDelay > 0) {
+            setTimeout(async () => {
+                try {
+                    const message = `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 Дата: ${new Date(date).toLocaleDateString('uk-UA')}\n\n⚠️ Платіж сьогодні!`;
+                    await bot.sendMessage(chatId, message);
+                } catch (err) {
+                    console.error('Scheduled reminder error:', err.message);
+                }
+            }, dayDelay);
+        }
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('schedule-reminder error:', err.message);
+        res.status(500).json({ error: 'failed to schedule reminder' });
+    }
+});
+
 // WayForPay: subscription link
 app.post('/api/create-subscription-link', async (req, res) => {
     try {
