@@ -146,7 +146,8 @@ body.modal-open {
     z-index: 99;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding: 0 8px;
+    padding: 12px 16px;
+    gap: 8px;
     top: 0;
 }
 
@@ -155,44 +156,60 @@ body.modal-open {
 }
 
 .tab-btn {
-    flex: 1;
-    min-width: 100px;
-    padding: 16px 20px;
-    background: none;
-    border: none;
+    flex: 0 0 auto;
+    min-width: auto;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    border-bottom: 3px solid transparent;
     transition: var(--transition);
     white-space: nowrap;
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: var(--shadow-sm);
 }
 
-.tab-btn::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 3px;
-    background: var(--primary-gradient);
+.tab-btn .tab-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: var(--transition);
+}
+
+.tab-btn .tab-text {
     transition: var(--transition);
 }
 
 .tab-btn.active {
     color: var(--text-primary);
+    background: var(--primary-gradient);
+    border-color: transparent;
+    box-shadow: var(--shadow-md), 0 0 20px rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px);
 }
 
-.tab-btn.active::before {
-    width: 80%;
+.tab-btn.active .tab-icon {
+    opacity: 1;
+    transform: scale(1.1);
 }
 
-.tab-btn:hover {
+.tab-btn:hover:not(.active) {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-card-hover);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.tab-btn:hover:not(.active) .tab-icon {
+    opacity: 1;
 }
 
 /* Main Content */
@@ -1006,6 +1023,8 @@ body.modal-open {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 }
 
 .document-item {
@@ -1018,6 +1037,37 @@ body.modal-open {
     justify-content: space-between;
     align-items: center;
     transition: var(--transition);
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.document-actions {
+    touch-action: manipulation;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.document-actions button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+    min-width: 100px;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Prevent accidental clicks during scroll */
+.document-item:active .document-actions button {
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .document-actions button {
+        min-height: 44px;
+        padding: 12px 16px;
+    }
 }
 
 .document-item:hover {
@@ -1172,15 +1222,47 @@ body.modal-open {
     }
     
     .tabs {
-        padding: 0 8px;
-        gap: 4px;
-        overflow-x: auto;
+        padding: 10px 12px;
+        gap: 6px;
+        overflow-x: hidden;
+        justify-content: space-between;
     }
     
     .tab-btn {
+        flex: 1;
+        min-width: 0;
         padding: 8px 12px;
         font-size: 12px;
         white-space: nowrap;
+        gap: 6px;
+        justify-content: center;
+    }
+    
+    .tab-btn .tab-icon {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .tab-btn .tab-text {
+        display: none;
+    }
+    
+    @media (min-width: 480px) {
+        .tabs {
+            overflow-x: auto;
+            justify-content: flex-start;
+        }
+        
+        .tab-btn {
+            flex: 0 0 auto;
+            min-width: auto;
+            padding: 8px 12px;
+            justify-content: flex-start;
+        }
+        
+        .tab-btn .tab-text {
+            display: inline;
+        }
     }
     
     .btn-primary,
@@ -1204,15 +1286,24 @@ body.modal-open {
     .document-item {
         flex-direction: column;
         align-items: flex-start;
+        padding: 16px;
+        gap: 12px;
+    }
+    
+    .document-info {
+        width: 100%;
     }
     
     .document-actions {
         width: 100%;
-        margin-top: 10px;
+        margin-top: 8px;
+        margin-left: 0;
     }
     
     .document-actions button {
         width: 100%;
+        padding: 12px;
+        font-size: 14px;
     }
 }
 
@@ -1268,9 +1359,27 @@ body.modal-open {
         font-size: 16px;
     }
     
+    .tabs {
+        padding: 8px 10px;
+        gap: 4px;
+    }
+    
     .tab-btn {
-        padding: 6px 10px;
+        flex: 1;
+        min-width: 0;
+        padding: 8px 10px;
         font-size: 11px;
+        gap: 4px;
+        justify-content: center;
+    }
+    
+    .tab-btn .tab-icon {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .tab-btn .tab-text {
+        display: none;
     }
     
     .close-btn {

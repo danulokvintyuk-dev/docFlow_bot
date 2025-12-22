@@ -338,10 +338,7 @@ function initializeContracts() {
             `;
             
             grid.querySelectorAll('.contract-type-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const typeId = card.dataset.type;
-                    openContractModal(typeId);
-                });
+                attachContractTypeCardHandlers(card);
             });
             
             newContractBtn.style.display = 'block';
@@ -377,16 +374,7 @@ function initializeContracts() {
         `).join('');
 
         grid.querySelectorAll('.contract-type-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const typeId = card.dataset.type;
-                openContractModal(typeId);
-            });
-            // Add touchstart for mobile/webview to ensure immediate response
-            card.addEventListener('touchstart', (ev) => {
-                ev.preventDefault();
-                const typeId = card.dataset.type;
-                openContractModal(typeId);
-            }, { passive: false });
+            attachContractTypeCardHandlers(card);
             // Make cards keyboard-focusable and behave like buttons
             try { card.tabIndex = 0; card.setAttribute('role', 'button'); card.style.touchAction = 'manipulation'; } catch (e) {}
         });
@@ -1279,11 +1267,132 @@ function renderContractsList() {
                 <p>${contract.counterpartyName || contract.tenantName || 'не вказано'} • ${formatDate(contract.createdAt)} • ${contract.amount ? contract.amount.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' }) : 'не вказано'}</p>
             </div>
             <div class="document-actions">
-                <button class="btn-secondary" onclick="regenerateContract('${contract.id}')">Завантажити</button>
+                <button class="btn-secondary contract-download-btn" data-contract-id="${contract.id}">Завантажити</button>
             </div>
         </div>
     `).join('');
+    
+    // Attach event handlers with scroll detection
+    attachContractButtonHandlers();
 }
+
+// Universal tap handler for contract type cards (no accidental click on scroll/hold)
+function attachContractTypeCardHandlers(card) {
+    let touchStartY = 0, touchStartX = 0, touchStartTime = 0, moved = false;
+    card.addEventListener('touchstart', e => {
+        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches[0].clientX;
+        touchStartTime = Date.now();
+        moved = false;
+    }, {passive: true});
+    card.addEventListener('touchmove', e => {
+        const dY = Math.abs(e.touches[0].clientY - touchStartY);
+        const dX = Math.abs(e.touches[0].clientX - touchStartX);
+        if (dY > 5 || dX > 5) moved = true;
+    }, {passive: true});
+    card.addEventListener('touchend', e => {
+        const tapTime = Date.now() - touchStartTime;
+        const dY = Math.abs((e.changedTouches[0]?.clientY||0) - touchStartY);
+        const dX = Math.abs((e.changedTouches[0]?.clientX||0) - touchStartX);
+        // Логіка: тільки швидкий tap, без scroll/drag і hold!
+        if (!moved && tapTime < 200 && dY < 5 && dX < 5) {
+            e.preventDefault();
+            e.stopPropagation();
+            const typeId = card.dataset.type;
+            if (typeId) openContractModal(typeId);
+        }
+    }, {passive: false});
+    card.addEventListener('click', () => {
+        const typeId = card.dataset.type;
+        if (typeId) openContractModal(typeId);
+    });
+}
+
+// Track touch movement to distinguish scroll from tap
+function attachContractButtonHandlers() {
+    const buttons = document.querySelectorAll('.contract-download-btn');
+
+    let isPageScrolling = false;
+    let scrollCheckInterval = null;
+    let lastScrollY = window.scrollY || document.documentElement.scrollTop;
+
+    // Track scroll to block accidental taps
+    window.addEventListener('scroll', () => {
+        isPageScrolling = true;
+        clearTimeout(scrollCheckInterval);
+        scrollCheckInterval = setTimeout(() => { isPageScrolling = false; }, 300);
+        lastScrollY = window.scrollY || document.documentElement.scrollTop;
+    });
+
+    buttons.forEach(btn => {
+        // Remove any existing listeners by cloning
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        let touchStartY = 0;
+        let touchStartX = 0;
+        let touchStartTime = 0;
+        let maxDeltaY = 0;
+        let maxDeltaX = 0;
+        let touchActive = false;
+
+        newBtn.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            touchStartTime = Date.now();
+            maxDeltaY = 0;
+            maxDeltaX = 0;
+            touchActive = true;
+        }, { passive: true });
+
+        newBtn.addEventListener('touchmove', (e) => {
+            if (!touchActive) return;
+            const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+            const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+            maxDeltaY = Math.max(maxDeltaY, deltaY);
+            maxDeltaX = Math.max(maxDeltaX, deltaX);
+            // Якщо рух більше 5px — рахуємо це за скрол
+            if (maxDeltaY > 5 || maxDeltaX > 5) touchActive = false;
+        }, { passive: true });
+
+        newBtn.addEventListener('touchend', (e) => {
+            const touchDuration = Date.now() - touchStartTime;
+            const finalDeltaY = Math.abs((e.changedTouches[0]?.clientY || 0) - touchStartY);
+            const finalDeltaX = Math.abs((e.changedTouches[0]?.clientX || 0) - touchStartX);
+            // Кнопка спрацьовує ТІЛЬКИ якщо:
+            // 1. Не скролили
+            // 2. рух/зрушення < 5px
+            // 3. час торкання < 400мс, але > 30мс (тобто простий tap, НЕ зажатий!)
+            // 4. лише після відпускання
+            if (!isPageScrolling && touchActive && finalDeltaY < 5 && finalDeltaX < 5 && touchDuration > 30 && touchDuration < 400) {
+                e.preventDefault();
+                e.stopPropagation();
+                const contractId = newBtn.getAttribute('data-contract-id');
+                if (contractId) {
+                    regenerateContract(contractId);
+                }
+            }
+            // Reset
+            touchStartY = 0;
+            touchStartX = 0;
+            touchStartTime = 0;
+            maxDeltaY = 0;
+            maxDeltaX = 0;
+            touchActive = false;
+        }, { passive: false });
+
+        // Для десктопа — без затримок, але теж без скролу
+        newBtn.addEventListener('click', (e) => {
+            if (!isPageScrolling) {
+                const contractId = newBtn.getAttribute('data-contract-id');
+                if (contractId) {
+                    regenerateContract(contractId);
+                }
+            }
+        });
+    });
+}
+
 
 window.regenerateContract = function(id) {
     const contract = appState.contracts.find(c => c.id === id);

@@ -11,7 +11,7 @@
     <!-- DOCX generator + file download helpers -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/9.5.1/docx.umd.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=1.0.22">
     <!-- flatpickr for consistent datepicker on mobile/webviews -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -47,11 +47,36 @@
 
         <!-- Navigation Tabs -->
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="contracts">Договори</button>
-            <button class="tab-btn" data-tab="invoices">Рахунки</button>
-            <button class="tab-btn" data-tab="analytics">Аналітика</button>
-            <button class="tab-btn" data-tab="finance">Фінанси</button>
-            <button class="tab-btn" data-tab="subscription">Підписка</button>
+            <button class="tab-btn active" data-tab="contracts">
+                <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span class="tab-text">Договори</span>
+            </button>
+            <button class="tab-btn" data-tab="invoices">
+                <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="9" x2="15" y2="9"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+                <span class="tab-text">Рахунки</span>
+            </button>
+            <button class="tab-btn" data-tab="finance">
+                <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                <span class="tab-text">Фінанси</span>
+            </button>
+            <button class="tab-btn" data-tab="subscription">
+                <svg class="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 7h-4M4 7h4m16 0v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7m16 0V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"></path>
+                </svg>
+                <span class="tab-text">Підписка</span>
+            </button>
         </nav>
 
         <!-- Main Content -->
@@ -421,51 +446,6 @@
                 </div>
             </div>
 
-            <!-- Analytics Tab -->
-            <div class="tab-content" id="analytics">
-                <div class="hero-section">
-                    <h2>Аналітика доходів</h2>
-                    <p class="hero-description">Відстежуйте доходи, автоматично розраховуйте податки та отримуйте прогнози. Експортуйте дані для звітності.</p>
-                </div>
-
-                <div id="financialAlert" style="display:none; margin-bottom:16px;"></div>
-
-                <div class="section-header">
-                    <button class="btn-secondary" id="exportExcelBtn">Експорт даних</button>
-                </div>
-
-                <div class="analytics-cards">
-                    <div class="analytics-card">
-                        <div class="card-label">Дохід за місяць</div>
-                        <div class="card-value" id="monthlyIncome">0 ₴</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-label">Податок</div>
-                        <div class="card-value" id="monthlyTax">0 ₴</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-label">Прогноз на рік</div>
-                        <div class="card-value" id="yearForecast">0 ₴</div>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <canvas id="incomeChart"></canvas>
-                </div>
-
-                <div class="tax-settings">
-                    <h3>Налаштування податків</h3>
-                    <div class="form-group">
-                        <label>Система оподаткування</label>
-                        <select id="taxSystem">
-                            <option value="single">Єдиний податок (5%)</option>
-                            <option value="single-10">Єдиний податок (10%)</option>
-                            <option value="general">Загальна система</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
             <!-- Finance Tab -->
             <div class="tab-content" id="finance">
                 <div class="hero-section">
@@ -728,7 +708,7 @@
     <!-- Bust cache for Telegram Web App -->
     <script src="config.js?v=1.0.15"></script>
     <script src="api.js?v=1.0.15"></script>
-    <script src="app.js?v=1.0.15"></script>
+    <script src="app.js?v=1.0.21"></script>
     <script>
         // Detect if app.js failed to load
         setTimeout(() => {
