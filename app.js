@@ -1560,32 +1560,61 @@ function initializeFinance() {
     }
 
     // Transaction buttons
-    document.getElementById('newIncomeBtn').addEventListener('click', () => openTransactionModal('income'));
-    document.getElementById('newExpenseBtn').addEventListener('click', () => openTransactionModal('expense'));
-    document.getElementById('newReminderBtn').addEventListener('click', openReminderModal);
-    document.getElementById('manageCategoriesBtn').addEventListener('click', openCategoryModal);
-    document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+    const newIncomeBtn = document.getElementById('newIncomeBtn');
+    if (newIncomeBtn) newIncomeBtn.addEventListener('click', () => openTransactionModal('income'));
+    
+    const newExpenseBtn = document.getElementById('newExpenseBtn');
+    if (newExpenseBtn) newExpenseBtn.addEventListener('click', () => openTransactionModal('expense'));
+    
+    const newReminderBtn = document.getElementById('newReminderBtn');
+    if (newReminderBtn) newReminderBtn.addEventListener('click', openReminderModal);
+    
+    const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+    if (manageCategoriesBtn) manageCategoriesBtn.addEventListener('click', openCategoryModal);
+    
+    const generateReportBtn = document.getElementById('generateReportBtn');
+    if (generateReportBtn) generateReportBtn.addEventListener('click', generateReport);
 
     // Transaction modal handlers
-    document.getElementById('closeTransactionModal').addEventListener('click', closeTransactionModal);
-    document.getElementById('cancelTransactionBtn').addEventListener('click', closeTransactionModal);
-    document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
-    document.getElementById('transactionType').addEventListener('change', (e) => {
-        updateCategoryOptions(e.target.value);
-    });
+    const closeTransactionModalBtn = document.getElementById('closeTransactionModal');
+    if (closeTransactionModalBtn) closeTransactionModalBtn.addEventListener('click', closeTransactionModal);
+    
+    const cancelTransactionBtn = document.getElementById('cancelTransactionBtn');
+    if (cancelTransactionBtn) cancelTransactionBtn.addEventListener('click', closeTransactionModal);
+    
+    const transactionForm = document.getElementById('transactionForm');
+    if (transactionForm) transactionForm.addEventListener('submit', handleTransactionSubmit);
+    
+    const transactionType = document.getElementById('transactionType');
+    if (transactionType) {
+        transactionType.addEventListener('change', (e) => {
+            updateCategoryOptions(e.target.value);
+        });
+    }
 
     // Reminder modal handlers
-    document.getElementById('closeReminderModal').addEventListener('click', closeReminderModal);
-    document.getElementById('cancelReminderBtn').addEventListener('click', closeReminderModal);
-    document.getElementById('reminderForm').addEventListener('submit', handleReminderSubmit);
+    const closeReminderModalBtn = document.getElementById('closeReminderModal');
+    if (closeReminderModalBtn) closeReminderModalBtn.addEventListener('click', closeReminderModal);
+    
+    const cancelReminderBtn = document.getElementById('cancelReminderBtn');
+    if (cancelReminderBtn) cancelReminderBtn.addEventListener('click', closeReminderModal);
+    
+    const reminderForm = document.getElementById('reminderForm');
+    if (reminderForm) reminderForm.addEventListener('submit', handleReminderSubmit);
 
     // Category modal handlers
-    document.getElementById('closeCategoryModal').addEventListener('click', closeCategoryModal);
-    document.getElementById('cancelCategoryBtn').addEventListener('click', closeCategoryModal);
-    document.getElementById('categoryForm').addEventListener('submit', handleCategorySubmit);
+    const closeCategoryModalBtn = document.getElementById('closeCategoryModal');
+    if (closeCategoryModalBtn) closeCategoryModalBtn.addEventListener('click', closeCategoryModal);
+    
+    const cancelCategoryBtn = document.getElementById('cancelCategoryBtn');
+    if (cancelCategoryBtn) cancelCategoryBtn.addEventListener('click', closeCategoryModal);
+    
+    const categoryForm = document.getElementById('categoryForm');
+    if (categoryForm) categoryForm.addEventListener('submit', handleCategorySubmit);
 
     // Filter
-    document.getElementById('transactionFilter').addEventListener('change', renderTransactionsList);
+    const transactionFilter = document.getElementById('transactionFilter');
+    if (transactionFilter) transactionFilter.addEventListener('change', renderTransactionsList);
 
     // Report buttons
     document.querySelectorAll('.report-btn').forEach(btn => {
@@ -1593,8 +1622,11 @@ function initializeFinance() {
     });
 
     // Set default date to today
-    document.getElementById('transactionDate').valueAsDate = new Date();
-    document.getElementById('reminderDate').valueAsDate = new Date();
+    const transactionDate = document.getElementById('transactionDate');
+    if (transactionDate) transactionDate.valueAsDate = new Date();
+    
+    const reminderDate = document.getElementById('reminderDate');
+    if (reminderDate) reminderDate.valueAsDate = new Date();
 
     // Modal background click handlers
     const transactionModal = document.getElementById('transactionModal');
@@ -1618,15 +1650,19 @@ function initializeFinance() {
         });
     }
 
-    // Initial render
-    renderTransactionsList();
-    renderCategories();
-    renderReminders();
-    updateFinanceSummary();
-    
-    // Check reminders every hour
-    checkReminders();
-    setInterval(checkReminders, 60 * 60 * 1000); // Check every hour
+    // Initial render (with error handling)
+    try {
+        renderTransactionsList();
+        renderCategories();
+        renderReminders();
+        updateFinanceSummary();
+        
+        // Check reminders every hour
+        checkReminders();
+        setInterval(checkReminders, 60 * 60 * 1000); // Check every hour
+    } catch (error) {
+        console.error('Помилка ініціалізації фінансового кабінету:', error);
+    }
 }
 
 function openTransactionModal(type = 'income') {
