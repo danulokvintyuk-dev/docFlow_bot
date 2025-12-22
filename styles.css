@@ -448,6 +448,8 @@ body.modal-open {
     animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 @keyframes slideUp {
@@ -546,6 +548,24 @@ body.modal-open {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.form-row .form-group {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.form-row .form-group input,
+.form-row .form-group select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .form-actions {
@@ -1441,6 +1461,7 @@ body.modal-open {
         max-width: 100% !important;
         -webkit-appearance: textfield !important;
         appearance: textfield !important;
+        overflow: hidden !important;
     }
 
     /* Ensure date inputs expand to container width when placed in a grid row */
@@ -1461,6 +1482,11 @@ body.modal-open {
         color: var(--text-primary) !important;
         padding-right: 44px !important; /* leave space for picker icon */
         background-image: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
 
     /* Ensure the native calendar icon doesn't push layout or become oversized */
@@ -1494,6 +1520,7 @@ body.modal-open {
 /* Style for flatpickr-applied inputs to match regular inputs */
 .date-text {
     width: 100% !important;
+    max-width: 100% !important;
     padding: 14px 18px !important;
     font-size: 15px !important;
     border: 2px solid rgba(255,255,255,0.1) !important;
@@ -1502,10 +1529,104 @@ body.modal-open {
     color: var(--text-primary) !important;
     box-sizing: border-box !important;
     min-height: 48px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
 }
 
 .flatpickr-calendar {
     z-index: 2000 !important;
+    position: fixed !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.flatpickr-calendar.open {
+    max-width: min(320px, calc(100vw - 20px)) !important;
+    width: auto !important;
+    min-width: 280px !important;
+}
+
+/* Центрування календаря */
+.flatpickr-calendar.arrowTop:before,
+.flatpickr-calendar.arrowTop:after {
+    display: none !important;
+}
+
+.flatpickr-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.flatpickr-months,
+.flatpickr-weekdays,
+.flatpickr-days {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+.flatpickr-day {
+    width: calc(100% / 7) !important;
+    max-width: calc(100% / 7) !important;
+    flex: 0 0 calc(100% / 7) !important;
+}
+
+/* Запобігання горизонтальній прокрутці */
+body.flatpickr-open {
+    overflow-x: hidden !important;
+}
+
+/* Для нативного datepicker на мобільних */
+input[type="date"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Гарантуємо, що form-group не дозволяє overflow */
+.form-group {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+/* Гарантуємо, що form-row не дозволяє overflow */
+.form-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+.form-row .form-group {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Загальні стилі для всіх input[type="date"] - гарантуємо, що вони не виходять за межі */
+.form-group input[type="date"],
+.form-group input[type="datetime-local"],
+.form-group input[type="time"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+/* Запобігання горизонтальній прокрутці в модальних вікнах */
+.modal-content {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
+.modal {
+    overflow-x: hidden !important;
 }
 
 

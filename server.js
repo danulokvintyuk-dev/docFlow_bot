@@ -412,8 +412,16 @@ async function setupWebhook() {
     }
 }
 
-// Serve static files
-app.use(express.static(__dirname));
+// Serve static files with no-cache headers for JS/CSS
+app.use(express.static(__dirname, {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js') || path.endsWith('.css')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // Main route
 app.get('/', (req, res) => {

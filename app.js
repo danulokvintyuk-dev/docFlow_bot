@@ -15,7 +15,7 @@ if (tg) {
 
 // Mark script load for diagnostics
 window.__APP_LOADED__ = true;
-window.__APP_VERSION__ = '1.0.9';
+window.__APP_VERSION__ = '1.0.22';
 
 // Basic diagnostics for browser console
 console.log('[init] app.js loaded');
@@ -72,9 +72,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeContracts();
     initializeInvoices();
     initializeAnalytics();
-    initializeFinance();
     initializeSubscription();
     updateSubscriptionBadge();
+    // Attach finance re-init to tab click
+    document.querySelector('[data-tab="finance"]').addEventListener('click', () => {
+      setTimeout(() => { initializeFinance(); }, 200);
+    });
+    // OPTIONAL: авто-ініціалізація, якщо одразу в фінкабінеті
+    if (document.querySelector('.tab-btn[data-tab="finance"]').classList.contains('active')) {
+      setTimeout(() => { initializeFinance(); }, 300);
+    }
+
     // Initialize flatpickr for mobile/webview if needed (fix oversized native date controls)
     initializeFlatpickrForMobile();
     // Use element-specific handlers (touchstart + click) for mobile
@@ -193,7 +201,7 @@ function initializeFlatpickrForMobile() {
         const isTelegram = /Telegram/i.test(ua) || !!window.Telegram;
         if (!isIOS || !isTelegram || typeof flatpickr === 'undefined') return;
 
-        const ids = ['startDate', 'endDate', 'rentStartDate', 'rentEndDate', 'invoiceDate'];
+        const ids = ['startDate', 'endDate', 'rentStartDate', 'rentEndDate', 'invoiceDate', 'transactionDate', 'reminderDate'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -204,10 +212,41 @@ function initializeFlatpickrForMobile() {
                 dateFormat: 'Y-m-d',
                 allowInput: true,
                 clickOpens: true,
+                static: false,
+                positionElement: el,
+                appendTo: document.body,
                 // match appearance to app theme
                 onReady: function(inst) {
                     // ensure input sizing matches other fields
                     inst.input.classList.add('date-text');
+                    // Fix calendar width and prevent horizontal scroll
+                    const calendar = inst.calendarContainer;
+                    if (calendar) {
+                        calendar.style.maxWidth = 'calc(100vw - 20px)';
+                        calendar.style.width = 'auto';
+                        calendar.style.minWidth = '280px';
+                    }
+                },
+                onOpen: function(inst) {
+                    // Prevent body scroll when calendar is open
+                    document.body.style.overflowX = 'hidden';
+                    // Center calendar on screen
+                    const calendar = inst.calendarContainer;
+                    if (calendar) {
+                        const rect = inst.input.getBoundingClientRect();
+                        const calendarWidth = calendar.offsetWidth;
+                        const viewportWidth = window.innerWidth;
+                        let left = rect.left + (rect.width / 2) - (calendarWidth / 2);
+                        // Keep calendar within viewport
+                        if (left < 10) left = 10;
+                        if (left + calendarWidth > viewportWidth - 10) {
+                            left = viewportWidth - calendarWidth - 10;
+                        }
+                        calendar.style.left = left + 'px';
+                    }
+                },
+                onClose: function() {
+                    document.body.style.overflowX = '';
                 }
             });
         });
@@ -1007,9 +1046,12 @@ _________________          _________________
 
 // Initialize Invoices
 function initializeInvoices() {
-    document.getElementById('newInvoiceBtn').addEventListener('click', () => {
-        openInvoiceModal();
-    });
+    const newInvoiceBtn = document.getElementById('newInvoiceBtn');
+    if (newInvoiceBtn) {
+        newInvoiceBtn.addEventListener('click', () => {
+            openInvoiceModal();
+        });
+    }
 
     document.querySelectorAll('.invoice-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1018,17 +1060,23 @@ function initializeInvoices() {
         });
     });
 
-    document.getElementById('closeInvoiceModal').addEventListener('click', closeInvoiceModal);
-    document.getElementById('closeInvoiceModal').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        closeInvoiceModal();
-    }, { passive: false });
+    const closeInvoiceModalBtn = document.getElementById('closeInvoiceModal');
+    if (closeInvoiceModalBtn) {
+        closeInvoiceModalBtn.addEventListener('click', closeInvoiceModal);
+        closeInvoiceModalBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            closeInvoiceModal();
+        }, { passive: false });
+    }
     
-    document.getElementById('cancelInvoiceBtn').addEventListener('click', closeInvoiceModal);
-    document.getElementById('cancelInvoiceBtn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        closeInvoiceModal();
-    }, { passive: false });
+    const cancelInvoiceBtn = document.getElementById('cancelInvoiceBtn');
+    if (cancelInvoiceBtn) {
+        cancelInvoiceBtn.addEventListener('click', closeInvoiceModal);
+        cancelInvoiceBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            closeInvoiceModal();
+        }, { passive: false });
+    }
     
     // Add modal background click handler to close modal
     const invoiceModal = document.getElementById('invoiceModal');
@@ -1040,9 +1088,28 @@ function initializeInvoices() {
         });
     }
     
-    document.getElementById('addItemBtn').addEventListener('click', addInvoiceItem);
-    document.getElementById('invoiceForm').addEventListener('submit', handleInvoiceSubmit);
-    document.getElementById('invoiceDate').valueAsDate = new Date();
+    const addItemBtn = document.getElementById('addItemBtn');
+    if (addItemBtn) {
+        addItemBtn.addEventListener('click', addInvoiceItem);
+    }
+    
+    const invoiceForm = document.getElementById('invoiceForm');
+    if (invoiceForm) {
+        invoiceForm.addEventListener('submit', handleInvoiceSubmit);
+    }
+    
+    const invoiceDate = document.getElementById('invoiceDate');
+    if (invoiceDate) {
+        try {
+    if ('valueAsDate' in invoiceDate) {
+        invoiceDate.valueAsDate = new Date();
+    } else {
+        invoiceDate.value = new Date().toISOString().slice(0, 10);
+    }
+} catch (err) {
+    invoiceDate.value = new Date().toISOString().slice(0, 10);
+}
+    }
 }
 
 function closeAllModals() {
@@ -1060,9 +1127,25 @@ function openInvoiceModal(type = 'invoice') {
     closeAllModals();
     const modal = document.getElementById('invoiceModal');
     const form = document.getElementById('invoiceForm');
-    document.getElementById('invoiceType').value = type;
+    if (!modal || !form) return;
+    
+    const invoiceType = document.getElementById('invoiceType');
+    if (invoiceType) {
+        invoiceType.value = type;
+    }
     form.reset();
-    document.getElementById('invoiceDate').valueAsDate = new Date();
+    const invoiceDateEl = document.getElementById('invoiceDate');
+    if (invoiceDateEl) {
+        try {
+    if ('valueAsDate' in invoiceDateEl) {
+        invoiceDateEl.valueAsDate = new Date();
+    } else {
+        invoiceDateEl.value = new Date().toISOString().slice(0, 10);
+    }
+} catch (err) {
+    invoiceDateEl.value = new Date().toISOString().slice(0, 10);
+}
+    }
     const itemsContainer = document.getElementById('invoiceItems');
     itemsContainer.innerHTML = `
         <div class="invoice-item">
@@ -1405,15 +1488,26 @@ window.regenerateContract = function(id) {
 
 // Initialize Analytics
 function initializeAnalytics() {
-    document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
-    document.getElementById('taxSystem').addEventListener('change', (e) => {
-        appState.taxSystem = e.target.value;
-        saveAppState();
-        updateAnalytics();
-    });
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    if (exportExcelBtn) {
+        exportExcelBtn.addEventListener('click', exportToExcel);
+    }
     
-    document.getElementById('taxSystem').value = appState.taxSystem;
-    updateAnalytics();
+    const taxSystem = document.getElementById('taxSystem');
+    if (taxSystem) {
+        taxSystem.addEventListener('change', (e) => {
+            appState.taxSystem = e.target.value;
+            saveAppState();
+            updateAnalytics();
+        });
+        taxSystem.value = appState.taxSystem;
+    }
+    
+    try {
+        updateAnalytics();
+    } catch (error) {
+        console.error('Помилка оновлення аналітики:', error);
+    }
 }
 
 function updateAnalytics() {
@@ -1446,12 +1540,20 @@ function updateAnalytics() {
         : 0;
     const yearForecast = avgMonthly * 12;
     
-    document.getElementById('monthlyIncome').textContent = 
-        monthlyIncome.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
-    document.getElementById('monthlyTax').textContent = 
-        monthlyTax.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
-    document.getElementById('yearForecast').textContent = 
-        yearForecast.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
+    const monthlyIncomeEl = document.getElementById('monthlyIncome');
+    if (monthlyIncomeEl) {
+        monthlyIncomeEl.textContent = monthlyIncome.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
+    }
+    
+    const monthlyTaxEl = document.getElementById('monthlyTax');
+    if (monthlyTaxEl) {
+        monthlyTaxEl.textContent = monthlyTax.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
+    }
+    
+    const yearForecastEl = document.getElementById('yearForecast');
+    if (yearForecastEl) {
+        yearForecastEl.textContent = yearForecast.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH' });
+    }
     
     // Update chart
     updateIncomeChart();
@@ -1623,10 +1725,30 @@ function initializeFinance() {
 
     // Set default date to today
     const transactionDate = document.getElementById('transactionDate');
-    if (transactionDate) transactionDate.valueAsDate = new Date();
+    if (transactionDate) {
+    try {
+        if ('valueAsDate' in transactionDate) {
+            transactionDate.valueAsDate = new Date();
+        } else {
+            transactionDate.value = new Date().toISOString().slice(0, 10);
+        }
+    } catch (err) {
+        transactionDate.value = new Date().toISOString().slice(0, 10);
+    }
+}
     
     const reminderDate = document.getElementById('reminderDate');
-    if (reminderDate) reminderDate.valueAsDate = new Date();
+    if (reminderDate) {
+    try {
+        if ('valueAsDate' in reminderDate) {
+            reminderDate.valueAsDate = new Date();
+        } else {
+            reminderDate.value = new Date().toISOString().slice(0, 10);
+        }
+    } catch (err) {
+        reminderDate.value = new Date().toISOString().slice(0, 10);
+    }
+}
 
     // Modal background click handlers
     const transactionModal = document.getElementById('transactionModal');
@@ -1671,8 +1793,22 @@ function openTransactionModal(type = 'income') {
     const title = document.getElementById('transactionModalTitle');
     
     form.reset();
-    document.getElementById('transactionType').value = type;
-    document.getElementById('transactionDate').valueAsDate = new Date();
+    const transactionTypeEl = document.getElementById('transactionType');
+    if (transactionTypeEl) {
+        transactionTypeEl.value = type;
+    }
+    const transactionDateEl = document.getElementById('transactionDate');
+    if (transactionDateEl) {
+        try {
+    if ('valueAsDate' in transactionDateEl) {
+        transactionDateEl.valueAsDate = new Date();
+    } else {
+        transactionDateEl.value = new Date().toISOString().slice(0, 10);
+    }
+} catch (err) {
+    transactionDateEl.value = new Date().toISOString().slice(0, 10);
+}
+    }
     title.textContent = type === 'income' ? 'Новий дохід' : 'Нова витрата';
     
     updateCategoryOptions(type);
@@ -1698,7 +1834,18 @@ function openReminderModal() {
     const form = document.getElementById('reminderForm');
     
     form.reset();
-    document.getElementById('reminderDate').valueAsDate = new Date();
+    const reminderDateEl = document.getElementById('reminderDate');
+    if (reminderDateEl) {
+        try {
+    if ('valueAsDate' in reminderDateEl) {
+        reminderDateEl.valueAsDate = new Date();
+    } else {
+        reminderDateEl.value = new Date().toISOString().slice(0, 10);
+    }
+} catch (err) {
+    reminderDateEl.value = new Date().toISOString().slice(0, 10);
+}
+    }
     updateReminderCategoryOptions();
     
     modal.style.display = 'flex';
@@ -2058,9 +2205,20 @@ function updateFinanceSummary() {
         return sum + (t.type === 'income' ? t.amount : -t.amount);
     }, 0);
     
-    document.getElementById('totalBalance').textContent = totalBalance.toFixed(2) + ' ₴';
-    document.getElementById('monthlyIncome').textContent = monthlyIncome.toFixed(2) + ' ₴';
-    document.getElementById('monthlyExpenses').textContent = monthlyExpenses.toFixed(2) + ' ₴';
+    const totalBalanceEl = document.getElementById('totalBalance');
+    if (totalBalanceEl) {
+        totalBalanceEl.textContent = totalBalance.toFixed(2) + ' ₴';
+    }
+    
+    const monthlyIncomeEl = document.getElementById('monthlyIncome');
+    if (monthlyIncomeEl) {
+        monthlyIncomeEl.textContent = monthlyIncome.toFixed(2) + ' ₴';
+    }
+    
+    const monthlyExpensesEl = document.getElementById('monthlyExpenses');
+    if (monthlyExpensesEl) {
+        monthlyExpensesEl.textContent = monthlyExpenses.toFixed(2) + ' ₴';
+    }
 }
 
 async function generateReport(period = 'month') {
@@ -2178,13 +2336,19 @@ window.deleteReminder = async function(id) {
 
 // Initialize Subscription
 function initializeSubscription() {
-    document.getElementById('subscribeProBtn').addEventListener('click', () => {
-        subscribeToPlan('pro');
-    });
+    const subscribeProBtn = document.getElementById('subscribeProBtn');
+    if (subscribeProBtn) {
+        subscribeProBtn.addEventListener('click', () => {
+            subscribeToPlan('pro');
+        });
+    }
     
-    document.getElementById('subscribeBusinessBtn').addEventListener('click', () => {
-        subscribeToPlan('business');
-    });
+    const subscribeBusinessBtn = document.getElementById('subscribeBusinessBtn');
+    if (subscribeBusinessBtn) {
+        subscribeBusinessBtn.addEventListener('click', () => {
+            subscribeToPlan('business');
+        });
+    }
 }
 
 function subscribeToPlan(plan) {
