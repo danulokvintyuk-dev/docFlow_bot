@@ -297,36 +297,35 @@ app.post('/api/schedule-reminder', async (req, res) => {
             return res.status(400).json({ error: 'chatId and date are required' });
         }
 
-        // Calculate when to send notification (1 day before)
-        const reminderDate = new Date(date);
-        const notificationDate = new Date(reminderDate);
-        notificationDate.setDate(notificationDate.getDate() - 1);
+        // Calculate when to send notification (using user's desired datetime)
+        const reminderDate = new Date(date); // date is in ISO string yyyy-mm-ddTHH:mm
         const now = new Date();
-        const delay = notificationDate.getTime() - now.getTime();
-
-        if (delay > 0) {
+        const delays = [];
+        // 1. За добу до події
+        let notify1 = new Date(reminderDate);
+        notify1.setDate(notify1.getDate() - 1);
+        if (notify1 > now) {
+            delays.push({delay: notify1.getTime() - now.getTime(), msg: `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 Дата: ${reminderDate.toLocaleString('uk-UA', {hour: '2-digit', minute: '2-digit'})}\n\n⏰ Платіж завтра!`});
+        }
+        // 2. В день події, за 1 годину
+        let notify2 = new Date(reminderDate);
+        notify2.setHours(notify2.getHours() - 1);
+        if (notify2 > now) {
+            delays.push({delay: notify2.getTime() - now.getTime(), msg: `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 ${reminderDate.toLocaleString('uk-UA', {hour: '2-digit', minute: '2-digit'})}\n\n⚠️ Через 1 годину!`});
+        }
+        // 3. В момент події
+        if (reminderDate > now) {
+            delays.push({delay: reminderDate.getTime() - now.getTime(), msg: `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 ${reminderDate.toLocaleString('uk-UA', {hour: '2-digit', minute: '2-digit'})}\n\n🔔 Час платежу!`});
+        }
+        delays.forEach(({delay, msg}) => {
             setTimeout(async () => {
                 try {
-                    const message = `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 Дата: ${new Date(date).toLocaleDateString('uk-UA')}\n\n⏰ Платіж завтра!`;
-                    await bot.sendMessage(chatId, message);
+                    await bot.sendMessage(chatId, msg);
                 } catch (err) {
                     console.error('Scheduled reminder error:', err.message);
                 }
             }, delay);
-        }
-
-        // Also send notification on the day
-        const dayDelay = reminderDate.getTime() - now.getTime();
-        if (dayDelay > 0) {
-            setTimeout(async () => {
-                try {
-                    const message = `🔔 Нагадування про платіж\n\n📌 ${title}\n💰 Сума: ${amount.toFixed(2)} ₴\n📅 Дата: ${new Date(date).toLocaleDateString('uk-UA')}\n\n⚠️ Платіж сьогодні!`;
-                    await bot.sendMessage(chatId, message);
-                } catch (err) {
-                    console.error('Scheduled reminder error:', err.message);
-                }
-            }, dayDelay);
-        }
+        });
 
         return res.json({ ok: true });
     } catch (err) {

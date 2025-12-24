@@ -1737,18 +1737,16 @@ function initializeFinance() {
     }
 }
     
-    const reminderDate = document.getElementById('reminderDate');
-    if (reminderDate) {
-    try {
-        if ('valueAsDate' in reminderDate) {
-            reminderDate.valueAsDate = new Date();
-        } else {
-            reminderDate.value = new Date().toISOString().slice(0, 10);
+    const reminderDateTime = document.getElementById('reminderDateTime');
+    if (reminderDateTime) {
+        try {
+            const now = new Date();
+            const local = now.toISOString().slice(0,16);
+            reminderDateTime.value = local;
+        } catch (err) {
+            reminderDateTime.value = '';
         }
-    } catch (err) {
-        reminderDate.value = new Date().toISOString().slice(0, 10);
     }
-}
 
     // Modal background click handlers
     const transactionModal = document.getElementById('transactionModal');
@@ -1834,17 +1832,15 @@ function openReminderModal() {
     const form = document.getElementById('reminderForm');
     
     form.reset();
-    const reminderDateEl = document.getElementById('reminderDate');
-    if (reminderDateEl) {
+    const reminderDateTimeEl = document.getElementById('reminderDateTime');
+    if (reminderDateTimeEl) {
         try {
-    if ('valueAsDate' in reminderDateEl) {
-        reminderDateEl.valueAsDate = new Date();
-    } else {
-        reminderDateEl.value = new Date().toISOString().slice(0, 10);
-    }
-} catch (err) {
-    reminderDateEl.value = new Date().toISOString().slice(0, 10);
-}
+            const now = new Date();
+            const local = now.toISOString().slice(0,16);
+            reminderDateTimeEl.value = local;
+        } catch (err) {
+            reminderDateTimeEl.value = '';
+        }
     }
     updateReminderCategoryOptions();
     
@@ -1946,7 +1942,7 @@ async function handleReminderSubmit(e) {
         id: `rem_${Date.now()}`,
         title: document.getElementById('reminderTitle').value,
         amount: parseFloat(document.getElementById('reminderAmount').value),
-        date: document.getElementById('reminderDate').value,
+        date: document.getElementById('reminderDateTime').value,
         categoryId: document.getElementById('reminderCategory').value || null,
         recurrence: document.getElementById('reminderRecurrence').value,
         createdAt: new Date().toISOString(),
@@ -1958,8 +1954,7 @@ async function handleReminderSubmit(e) {
     
     try {
         await api.saveReminder(reminder);
-        // Schedule notification
-        await scheduleReminderNotification(reminder);
+        // Не викликаємо scheduleReminderNotification тут, сервіс-бот сам відправить повідомлення
     } catch (error) {
         console.debug('API sync failed:', error.message);
     }
@@ -2308,6 +2303,9 @@ window.deleteTransaction = async function(id) {
     
     appState.transactions = appState.transactions.filter(t => t.id !== id);
     await saveAppState();
+    // Примусове оновлення локального стану для уникнення багу синхронізації
+    Object.assign(appState, JSON.parse(localStorage.getItem('docAppState')));
+    renderTransactionsList(); // одразу відмальовуємо            
     
     try {
         await api.deleteTransaction(id);
@@ -2739,5 +2737,3 @@ document.addEventListener('DOMContentLoaded', () => {
         // Skip - use the robust global functions
     }
 });
-
-
